@@ -1,9 +1,7 @@
 langgraph
 langchain-core
 pydantic
-python-dotenv
- 
-# Descomentar según el proveedor que se vaya a usar:
-# langchain-groq
-# langchain-cohere
-# langchain-google-genai
+python-dotenv 
+langchain-groq
+langchain-cohere
+langchain-google-genai
