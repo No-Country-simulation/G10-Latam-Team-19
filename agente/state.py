@@ -11,8 +11,14 @@ class AgentState(TypedDict, total=False):
     # ---- Completado en el nodo de Clasificación
     classification: Optional[Clasificacion]
 
-    # ---- Completado en el nodo de Extracción
+    # --- Completado en el nodo Extracción
     extracted_data: Optional[DatosExtraidos]
+    # EXTRACCIÓN: nombre y edad ausentes, destacados por la instrucción de Michelle.
+    missing_critical_fields: Optional[list[str]]
+    # EXTRACCIÓN: detalle de todos los campos que explican los descuentos aplicados.
+    missing_relevant_fields: Optional[list[str]]
+    # PROVISIONAL: completitud de extracción; no sustituye final_confidence_score.
+    extraction_confidence_score: Optional[float]
 
     # ---- Completado en el nodo de score de confianza / urgencia
     final_confidence_score: Optional[float]

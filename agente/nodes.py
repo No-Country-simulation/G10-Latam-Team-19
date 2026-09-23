@@ -54,19 +54,77 @@ def classification_node(state: AgentState) -> dict:
         ) from fallback_error
 
 def extraction_node(state: AgentState) -> dict:
-    """
-    Extrae los datos clínicos estructurados (paciente, médico, diagnóstico, CIE-10, etcétera),
-    validados contra el modelo 'DatosExtraidos' de schemas.py
+    """Extrae y valida datos clínicos, y registra campos críticos ausentes."""
+    import json
 
-    TODO (Seylin): Armar el prompt real, llamar get_llm(), parsear y validar.
-    """
+    from schemas import DatosExtraidos
+    from llm_provider import get_llm
+    from prompts import build_extraction_prompt
 
     document_text = state["document_text"]
-    classification = state.get("classification")
+    messages = build_extraction_prompt(document_text=document_text)
+    llm = get_llm()
+    # TEMPORAL: límite usado en pruebas con Groq; hoy se aplica a cualquier proveedor.
+    # Revisarlo antes de usar documentos largos: puede truncar el JSON de respuesta.
+    llm.max_tokens = 450
 
-    raise NotImplementedError(
-        "TODO (Seylin): implementar extraction_node con la llamada real al LLM"
-    )
+    # EXTRACCIÓN: ruta principal; Pydantic valida el contrato antes de calcular completitud.
+    # Capa 1: respuesta estructurada.
+    try:
+        structured_llm = llm.with_structured_output(DatosExtraidos)
+        result = structured_llm.invoke(messages)
+        extracted_data = DatosExtraidos.model_validate(result)
+
+    except Exception as structured_error:
+        # EXTRACCIÓN: respaldo funcional, no una prueba temporal.
+        # Permite validar JSON cuando falla o no se admite la respuesta estructurada.
+        # Capa 2: respuesta JSON y validación manual.
+        try:
+            response = llm.invoke(messages)
+
+            if not isinstance(response.content, str):
+                raise ValueError("La respuesta del LLM no es texto.")
+
+            text = response.content.strip()
+            text = (
+                text.removeprefix("```json")
+                .removeprefix("```")
+                .removesuffix("```")
+                .strip()
+            )
+
+            data = json.loads(text)
+            extracted_data = DatosExtraidos.model_validate(data)
+
+        except Exception as fallback_error:
+            raise RuntimeError(
+                "extraction_node: fallaron la respuesta estructurada "
+                "y el parseo JSON alternativo. "
+                f"Tipos de error: {type(structured_error).__name__} "
+                f"y {type(fallback_error).__name__}. "
+                "No se generaron datos de reemplazo."
+            ) from fallback_error
+
+    # EXTRACCIÓN / regla de Michelle: ausencias reducen la confianza de extracción.
+    # Se aplica tras ambas rutas, sin cambiar DatosExtraidos ni exigir datos opcionales.
+    # Los pesos son provisionales; el score final y la revisión humana son de otro nodo.
+    # La misma regla determinista se aplica a ambas rutas de extracción.
+    from confidence import confidence_score, missing_relevant_fields
+
+    # Solo se consulta el tipo ya disponible; no se ejecuta ni modifica la clasificación.
+    classification = state.get("classification")
+    document_type = classification.tipo_documento if classification else None
+    missing_fields = missing_relevant_fields(extracted_data, document_type)
+    return {
+        "extracted_data": extracted_data,
+        "missing_critical_fields": [
+            field for field in missing_fields
+            if field in ("paciente.nombre", "paciente.edad")
+        ],
+        "missing_relevant_fields": missing_fields,
+        "extraction_confidence_score": confidence_score(extracted_data, document_type),
+    }
+
 
 def confidence_node(state: AgentState) -> dict:
     """

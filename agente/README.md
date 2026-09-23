@@ -8,7 +8,7 @@ Estado actual: **flujo lineal**, sin ramas condicionales todavía.
 clasificación -> extracción -> score_confianza -> FIN
 ```
 
-Actualmente, el nodo de **clasificación está implementado y testeado de forma aislada**. Los nodos de extracción y score de confianza continúan como placeholders.
+Clasificación y extracción están implementadas con respuesta estructurada y fallback JSON validado por Pydantic. La extracción informa datos ausentes y un score provisional de completitud. El nodo de confianza final, la revisión humana y el enrutamiento siguen pendientes de sus responsables y de la matriz del equipo de Datos.
 
 ## Idioma
 
@@ -31,7 +31,7 @@ Esto es solo interno: el **contrato de salida** hacia el resto del sistema sigue
 | Nodo                          | Estado       | Responsable |
 | ----------------------------- | ------------ | ----------- |
 | Clasificación                 | Implementado | Jairo       |
-| Extracción                    | Pendiente    | Seylin      |
+| Extracción                    | Implementado | Seylin      |
 | Score de confianza / urgencia | Pendiente    | Natalia     |
 
 ### Clasificación
@@ -84,7 +84,7 @@ cp .env.example .env
 python main.py
 ```
 
-**Nota:** `main.py` todavía no puede completar el flujo entero porque `extraction_node` y `confidence_node` levantan `NotImplementedError` a propósito.
+**Nota:** `main.py` todavía no puede completar el flujo entero porque `confidence_node` conserva su `NotImplementedError` original. La extracción puede probarse de forma aislada; las llamadas reales requieren un proveedor LLM configurado.
 
 ## Próxima iteración esperada
 
@@ -95,3 +95,60 @@ Agregar las ramas condicionales para los distintos destinos del flujo, incluyend
 3. Las reglas de prioridad y urgencia.
 4. El mapeo entre clasificación, score y destino.
 5. Las condiciones que obligan a derivar un documento a revisión humana.
+
+
+## Regla de confianza por datos faltantes
+
+Regla de Michelle: datos relevantes ausentes reducen la confianza. Los pesos
+provisionales están centralizados en `confidence.py`; requieren calibración del
+equipo de Datos y no representan probabilidades de exactitud clínica.
+
+| Campo ausente | Descuento | Cuándo aplica |
+| --- | --- | --- |
+| `paciente.nombre` (nombre_paciente) | 0.15 | Siempre |
+| `paciente.edad` | 0.10 | Siempre |
+| `medico_solicitante.nombre` | 0.10 | Siempre |
+| `diagnostico_principal` | 0.20 | Siempre |
+| `estudio_realizado` | 0.10 | Informe de estudio o laboratorio |
+| `medicamentos` | 0.10 | Receta médica |
+| `dosis` | 0.05 | Receta médica o medicamentos presentes |
+
+`penalización = suma de los pesos de campos relevantes ausentes`.
+La extracción devuelve `extraction_confidence_score = max(0, 1 - penalización)`.
+Se limita a [0, 1] y se redondea a seis decimales. Se recalcula desde 1 para
+no acumular descuentos al repetir la extracción. Este valor describe únicamente
+la completitud de la extracción: no combina el score de clasificación ni
+establece `final_confidence_score` o `requires_human_review`. Esa integración
+queda pendiente del trabajo de los responsables del nodo de confianza y Datos.
+
+El esquema `DatosExtraidos` no cambia. La confianza se publica en el estado del
+grafo; no se añade un score solicitado al LLM al contrato de extracción. La
+matrícula y el CIE-10 no penalizan. Sin clasificación, la extracción aplica los
+campos comunes y dosis si hay medicamentos. Los campos opcionales no se vuelven obligatorios.
+
+Se consideran ausentes `None`, texto vacío, marcadores normalizados definidos
+en `MISSING_TEXT_VALUES` (incluido `Desconocido`) y listas sin valores útiles.
+La edad cero sí cuenta como presente. `missing_critical_fields` registra nombre
+y edad; `missing_relevant_fields` explica todos los descuentos aplicables.
+La política verifica presencia, no exactitud clínica ni correspondencia entre
+cada medicamento y su dosis.
+
+Con los demás datos relevantes completos:
+
+| Caso | Score provisional de extracción |
+| --- | --- |
+| Datos completos | 1.00 |
+| Sin nombre | 0.85 |
+| Sin edad | 0.90 |
+| Sin ambos | 0.75 |
+
+Pruebas locales sin credenciales ni llamadas al proveedor, desde la raíz:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s agente -p test_extraction_local.py -v
+.\.venv\Scripts\python.exe -m unittest discover -s agente -p test_confidence.py -v
+```
+
+Incluyen ambas rutas de extracción, campos opcionales, edad cero, reintentos
+y extracción sin clasificación previa. No se prueba la ejecución completa del
+grafo porque el nodo de confianza final sigue pendiente.
