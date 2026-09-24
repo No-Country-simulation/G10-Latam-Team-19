@@ -43,6 +43,12 @@ class DestinoEnrutamiento(str, Enum):
     REVISION_HUMANA = "Cola_Revision_Humana"
     HISTORIA_CLINICA = "Historia_Clinica_Electronica"
 
+# RECUPERADO: Lógica Pediátrica
+class UnidadEdad(str, Enum):
+    ANOS = "años"
+    MESES = "meses"
+    DIAS = "dias"
+
 
 # -------------------
 # Request: Lo que llega al endpoint
@@ -83,6 +89,10 @@ class Clasificacion(BaseModel):
 class Paciente(BaseModel):
     nombre: str
     edad: Optional[int] = Field(None, ge=0, le=130)
+    unidad_edad: Optional[UnidadEdad] = Field(
+        default=UnidadEdad.ANOS, 
+        description="Vital para diferenciar meses/días en pediatría"
+    )
     sexo: Optional[str] = Field(None, pattern=r"^(M|F)$")
     documento_identidad: Optional[str] = Field(
         None,
@@ -105,14 +115,17 @@ class MedicamentoPrescrito(BaseModel):
 class SignosVitales(BaseModel):
     temperatura: Optional[float] = Field(
         None,
+        ge=25.0, le=45.0,
         description="Temperatura corporal en grados Celsius, ej: 39.5",
     )
     frecuencia_cardiaca: Optional[int] = Field(
         None,
-        description="Latidos por minuto (lpm), ej: 110",
+        ge=0, le=200,
+        description="Latidos por minuto (lpm) - Límite, ej: 110",
     )
     frecuencia_respiratoria: Optional[int] = Field(
         None,
+        ge=0, le=100,
         description="Respiraciones por minuto (rpm), ej: 24",
     )
     presion_arterial: Optional[str] = Field(
@@ -193,8 +206,9 @@ if __name__ == "__main__":
             "paciente": {
                 "nombre": "Carlos Eduardo Mendes",
                 "edad": 52,
+                "unidad_edad": "años",
                 "sexo": "M",
-                "documento_identidad": "1234567890"
+                "documento_identidad": "AB123456"
             },
             "medico_solicitante": {"nombre": "Dra. Renata Silveira", "matricula": "145892"},
             "estudio_realizado": "Tomografia de Torax con contraste",
@@ -232,5 +246,5 @@ if __name__ == "__main__":
     }
 
     respuesta = TriageResponse(**ejemplo)
-    print("✅ Schema válido. Ejemplo parseado correctamente:")
+    print("✅ Schema válido y ejemplo de respuesta generado correctamente.")
     print(respuesta.model_dump_json(indent=2))
