@@ -1,36 +1,88 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MediFlow — Frontend
 
-## Getting Started
+Interfaz web de **MediFlow**, el agente autónomo para triaje, extracción y enrutamiento de documentos clínicos (Hackathon ONE G10 · Oracle Next Education & Alura).
 
-First, run the development server:
+Permite consultar los documentos procesados por el agente, revisar su clasificación y prioridad, y resolver desde una cola de **auditoría humana** (Human-in-the-Loop) los casos de baja confianza o con datos faltantes.
+
+## Stack
+
+| Pieza | Versión |
+| --- | --- |
+| Next.js (App Router, Turbopack) | 16.3.6 |
+| React | 19.2.8 |
+| TypeScript (`strict`) | 5 |
+| Tailwind CSS | 4 |
+| shadcn/ui (preset `base-nova`) + lucide-react | — |
+| Gestor de paquetes | pnpm 12.6.0 |
+
+## Requisitos
+
+- Node.js **20.9 o superior**
+- pnpm, solo para instalar dependencias (el repositorio incluye `pnpm-lock.yaml`)
+
+## Puesta en marcha
+
+Instala las dependencias una sola vez y levanta el servidor:
 
 ```bash
+pnpm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+La aplicación queda disponible en <http://localhost:3000>.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+> Si `npm run dev` responde `next: not found`, las dependencias aún no están instaladas: ejecuta `pnpm install` y espera a que termine antes de arrancar.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Script | Descripción |
+| --- | --- |
+| `npm run dev` | Servidor de desarrollo |
+| `npm run build` | Compilación de producción |
+| `npm run start` | Sirve la compilación de producción |
+| `npm run lint` | Análisis estático con ESLint |
 
-## Learn More
+## Rutas
 
-To learn more about Next.js, take a look at the following resources:
+| Ruta | Descripción |
+| --- | --- |
+| `/` | Resumen (procesados, urgentes, pendientes de auditoría) y últimos documentos |
+| `/triaje/[id]` | Detalle de un triaje: clasificación, paciente, datos clínicos, signos vitales y enrutamiento |
+| `/historial` | Todos los documentos procesados |
+| `/auditoria` | Cola de auditoría humana con acciones Aprobar / Rechazar |
+| `/faq` | Preguntas frecuentes |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Estructura
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```text
+front-end/
+├── app/             # Rutas (App Router) y server actions
+├── components/      # Componentes propios; ui/ contiene los de shadcn/ui
+├── lib/
+│   ├── api.ts       # Única capa de acceso a datos
+│   └── mocks/       # Datos de prueba (urgencia, rutina y caso ambiguo)
+├── types/triage.ts  # Tipos derivados del contrato del backend
+└── docs/            # Decisiones de arquitectura
+```
 
-## Deploy on Vercel
+## Datos y contrato con el backend
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- El contrato es `schemas.py` (raíz del repositorio). Los tipos de `types/triage.ts` se derivan de él: los `Optional` de Pydantic son `T | null` y los enums son arreglos `as const` con sus valores literales.
+- Toda la lectura y escritura de datos pasa por `lib/api.ts`. Apuntar al backend real implica cambiar únicamente esa capa, sin tocar páginas ni componentes.
+- Por ahora las páginas usan **datos mock** en memoria (se reinician al reiniciar el servidor). Si se define `NEXT_PUBLIC_API_URL`, `procesarDocumento` llama al `POST /triage` real; el resto de funciones seguirá en mock hasta que el backend exponga endpoints de lectura.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Variable de entorno opcional (archivo `.env.local`):
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+## Estado
+
+- [x] Tipos TypeScript derivados de `schemas.py`
+- [x] Capa de API con datos mock
+- [x] Rutas `/`, `/triaje/[id]`, `/historial`, `/auditoria`, `/faq`
+- [ ] Diseño aplicado en `/` y `/triaje/[id]`
+- [ ] Integración con el backend real
+
+## Documentación adicional
+
+- [Decisiones de arquitectura](docs/ARQUITECTURA.md)
