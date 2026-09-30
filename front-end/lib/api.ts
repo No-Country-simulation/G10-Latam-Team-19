@@ -17,15 +17,17 @@ export interface Triaje extends TriageResponse {
   decision_auditoria: DecisionAuditoria | null;
 }
 
-// Estado en memoria (se reinicia al recargar el servidor): simula la
-// persistencia por estado que en producción hará OCI Object Storage.
-const triajes: Triaje[] = TRIAJES_MOCK.map((t) => ({
+// Estado en memoria (se reinicia al reiniciar el servidor): simula la
+// persistencia por estado que en producción hará OCI Object Storage. Vive en
+// globalThis para que páginas y server actions compartan la misma instancia.
+const store = globalThis as typeof globalThis & { __mediflowTriajes?: Triaje[] };
+const triajes: Triaje[] = (store.__mediflowTriajes ??= TRIAJES_MOCK.map((t) => ({
   ...t,
   estado: t.decision_enrutamiento.requiere_auditoria_humana
     ? "auditoria_humana"
     : "procesados",
   decision_auditoria: null,
-}));
+})));
 
 const latencia = () => new Promise((r) => setTimeout(r, 150));
 
