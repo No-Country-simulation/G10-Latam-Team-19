@@ -106,7 +106,7 @@ def extraction_node(state: AgentState) -> dict:
 
     # EXTRACCIÓN / regla de Michelle: ausencias reducen la confianza de extracción.
     # Se aplica tras ambas rutas, sin cambiar DatosExtraidos ni exigir datos opcionales.
-    # Los pesos son provisionales; el score final y la revisión humana son de otro nodo.
+    # Pesos del PDF de Datos; condiciones pendientes en PESOS_PENDIENTES.md.
     # La misma regla determinista se aplica a ambas rutas de extracción.
     from confidence import confidence_score, missing_relevant_fields
 

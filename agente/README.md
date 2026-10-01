@@ -99,66 +99,38 @@ Agregar las ramas condicionales para los distintos destinos del flujo, incluyend
 
 ## Regla de confianza por datos faltantes
 
-Regla de Michelle: datos relevantes ausentes reducen la confianza. Los pesos
-provisionales están centralizados en `confidence.py`; requieren calibración del
-equipo de Datos y no representan probabilidades de exactitud clínica.
+Pesos de `Proyecto alura_Data_UmbralScoreyReglas.pdf`, páginas 10-11.
+El score de extracción mide completitud, no exactitud clínica. Se calcula desde
+1 en cada ejecución, resta las categorías ausentes una sola vez, se limita a
+[0, 1] y se redondea a seis decimales.
 
-| Campo ausente | Descuento | Cuándo aplica |
+| Categoría | Descuento | Aplicación actual |
 | --- | --- | --- |
-| `paciente.nombre` (nombre_paciente) | 0.15 | Siempre |
-| `paciente.edad` | 0.10 | Siempre |
-| `medico_solicitante.nombre` | 0.10 | Siempre |
-| `diagnostico_principal` | 0.20 | Siempre |
-| `estudio_realizado` | 0.10 | Informe de estudio o laboratorio |
-| `medicamentos` | 0.10 | Receta médica |
-| `dosis` | 0.05 | Receta médica o medicamentos presentes |
+| Nombre | 0.30 | Siempre, conservando la regla acordada |
+| Edad numérica | 0.15 | Siempre, conservando la regla acordada; cero es válido |
+| Diagnóstico o CIE-10 | 0.15 | Si faltan ambos |
+| Medicamento o dosis | 0.30 | En receta, si falta cualquiera en alguna entrada |
+| Frecuencia diaria | 0.05 | En receta, si falta en alguna entrada o no hay medicamentos |
+| Signos vitales incompletos | 0.10 | Si existe el objeto y falta alguno de sus cinco campos |
+| Sexo | 0.05 | Descuento base por ausencia; no se infiere dependencia clínica |
+| Unidad de edad pediátrica | 0.30 | Peso registrado, aplicación pendiente de señal de pediatría |
 
-`penalización = suma de los pesos de campos relevantes ausentes`.
-La extracción devuelve `extraction_confidence_score = max(0, 1 - penalización)`.
-Se limita a [0, 1] y se redondea a seis decimales. Se recalcula desde 1 para
-no acumular descuentos al repetir la extracción. Este valor describe únicamente
-la completitud de la extracción: no combina el score de clasificación ni
-establece `final_confidence_score` o `requires_human_review`. Esa integración
-queda pendiente del trabajo de los responsables del nodo de confianza y Datos.
+Nombre y edad ausentes se conservan en `missing_critical_fields`. Todas las
+categorías aplicadas aparecen en `missing_relevant_fields`; las etiquetas de
+medicamentos/dosis y diagnóstico cambiaron para reflejar penalizaciones agrupadas.
+No se penaliza médico ni estudio, porque no figuran en la tabla del PDF.
+No se añade vía al schema. Las decisiones temporales y preguntas para Datos
+están en [PESOS_PENDIENTES.md](PESOS_PENDIENTES.md).
 
-El esquema `DatosExtraidos` no cambia. La confianza se publica en el estado del
-grafo; no se añade un score solicitado al LLM al contrato de extracción. La
-matrícula y el CIE-10 no penalizan. Sin clasificación, la extracción aplica los
-campos comunes y dosis si hay medicamentos. Los campos opcionales no se vuelven obligatorios.
+Con las demás categorías completas: sin nombre 0.70, sin edad 0.85 y sin ambos
+0.55. La extracción conserva `extraction_confidence_score`; no modifica el score
+LLM de clasificación ni implementa el filtro, la prioridad o el enrutamiento.
+Los pesos están alineados al PDF, pero su aplicación clínica completa requiere
+resolver los pendientes documentados.
 
-Se consideran ausentes `None`, texto vacío, marcadores normalizados definidos
-en `MISSING_TEXT_VALUES` (incluido `Desconocido`) y listas sin valores útiles.
-La edad cero sí cuenta como presente. `missing_critical_fields` registra nombre
-y edad; `missing_relevant_fields` explica todos los descuentos aplicables.
-La política verifica presencia, no exactitud clínica. Cada medicamento contiene
-`nombre`, `dosis` y `frecuencia_diaria`; ya no se usan listas separadas de dosis.
-Se aplica un único descuento de 0.05 si falta alguna dosis de los medicamentos
-con nombre útil (o si una receta no contiene medicamentos útiles). La etiqueta
-`dosis` en `missing_relevant_fields` se conserva para compatibilidad con el estado.
-Los medicamentos con nombre vacío o desconocido no cuentan como presentes.
-
-La extracción incluye `signos_vitales`, `unidad_edad`, `sexo` y
-`documento_identidad` según el schema de Datos. Estos campos, la frecuencia
-diaria, la matrícula y el CIE-10 siguen siendo opcionales sin nuevos descuentos.
-El prompt solicita null para datos ausentes o inválidos; Pydantic valida ambas
-rutas de respuesta. El nodo respeta el límite de tokens del proveedor.
-
-Con los demás datos relevantes completos:
-
-| Caso | Score provisional de extracción |
-| --- | --- |
-| Datos completos | 1.00 |
-| Sin nombre | 0.85 |
-| Sin edad | 0.90 |
-| Sin ambos | 0.75 |
-
-Pruebas locales sin credenciales ni llamadas al proveedor, desde la raíz:
+Pruebas locales sin llamadas al proveedor, desde la raíz:
 
 ```powershell
-.\.venv\Scripts\python.exe -m unittest discover -s agente -p test_extraction_local.py -v
-.\.venv\Scripts\python.exe -m unittest discover -s agente -p test_confidence.py -v
+.\.venv\Scripts\python.exe -m unittest discover -s agente -p 'test_*.py' -v
+.\.venv\Scripts\python.exe -m compileall -q agente schemas.py
 ```
-
-Incluyen ambas rutas de extracción, campos opcionales, edad cero, reintentos
-y extracción sin clasificación previa. No se prueba la ejecución completa del
-grafo porque el nodo de confianza final sigue pendiente.

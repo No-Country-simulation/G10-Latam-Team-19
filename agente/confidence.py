@@ -4,24 +4,22 @@ from types import MappingProxyType
 from schemas import DatosExtraidos, TipoDocumento
 
 
-# PROVISIONAL (Datos): Michelle indicó bajar el score por ausencias, no estos pesos.
-# Centralizarlos permite calibrarlos sin cambiar la extracción ni el nodo final.
+# Fuente: Proyecto alura_Data_UmbralScoreyReglas.pdf, pp. 10-11.
+# Condiciones pendientes y decisiones temporales: PESOS_PENDIENTES.md.
 MISSING_FIELD_PENALTIES = MappingProxyType({
-    "paciente.nombre": 0.15,
-    "paciente.edad": 0.10,
-    "medico_solicitante.nombre": 0.10,
-    "diagnostico_principal": 0.20,
-    "estudio_realizado": 0.10,
-    "medicamentos": 0.10,
-    "dosis": 0.05,
+    "paciente.nombre": 0.30,
+    "medicamentos_o_dosis": 0.30,
+    "paciente.unidad_edad": 0.30,  # Pendiente: señal explícita de pediatría.
+    "diagnostico_o_cie10": 0.15,
+    "paciente.edad": 0.15,
+    "signos_vitales": 0.10,
+    "paciente.sexo": 0.05,
+    "frecuencia_diaria": 0.05,
 })
 # EXTRACCIÓN: normalizar marcadores evita contar "Desconocido" como dato presente.
 MISSING_TEXT_VALUES = frozenset({
     "", "desconocido", "desconocida", "null", "none", "n/a",
     "no consta", "no consignado", "no consignada", "no informado", "no informada",
-})
-STUDY_DOCUMENT_TYPES = frozenset({
-    TipoDocumento.INFORME_ESTUDIO, TipoDocumento.INFORME_LABORATORIO,
 })
 
 
@@ -39,32 +37,38 @@ def is_missing(value: object) -> bool:
 def missing_relevant_fields(
     data: DatosExtraidos, document_type: TipoDocumento | None = None,
 ) -> list[str]:
-    # EXTRACCIÓN: registrar ausencias explica el descuento sin rechazar campos opcionales.
+    # Mantener nombre y edad como críticos, sin inferirlos del documento.
     fields = {
         "paciente.nombre": data.paciente.nombre,
         "paciente.edad": data.paciente.edad,
-        "medico_solicitante.nombre": (
-            data.medico_solicitante.nombre if data.medico_solicitante else None
+        "diagnostico_o_cie10": (
+            None if is_missing(data.diagnostico_principal) and is_missing(data.cie10_sugerido)
+            else True
         ),
-        "diagnostico_principal": data.diagnostico_principal,
+        "paciente.sexo": data.paciente.sexo,
     }
-    # No exigir estudios ni tratamiento en documentos donde pueden no aplicar.
-    if document_type in STUDY_DOCUMENT_TYPES:
-        fields["estudio_realizado"] = data.estudio_realizado
-    medications = [
-        medication for medication in (data.medicamentos or [])
-        if not is_missing(medication.nombre)
-    ]
     if document_type == TipoDocumento.RECETA_MEDICA:
-        fields["medicamentos"] = medications
-    if document_type == TipoDocumento.RECETA_MEDICA or medications:
-        # Un único descuento si falta alguna dosis, sin multiplicar el peso
-        # por el número de medicamentos. Una dosis sin nombre no aporta datos.
-        fields["dosis"] = (
-            None if not medications or any(is_missing(m.dosis) for m in medications)
+        medications = data.medicamentos or []
+        # Una penalización por categoría, no por medicamento o subcampo.
+        # La vía no existe en el contrato actual y no se inventa.
+        fields["medicamentos_o_dosis"] = (
+            None if not medications or any(
+                is_missing(m.nombre) or is_missing(m.dosis) for m in medications
+            ) else True
+        )
+        fields["frecuencia_diaria"] = (
+            None if not medications or any(is_missing(m.frecuencia_diaria) for m in medications)
             else True
         )
-    # Matrícula y CIE-10 siguen siendo opcionales sin penalización.
+    # Un objeto presente permite detectar incompletitud; null no permite
+    # distinguir entre «no aplica» y «faltan todos». Pendiente de Datos.
+    if data.signos_vitales is not None:
+        fields["signos_vitales"] = (
+            None if any(is_missing(v) for v in data.signos_vitales.model_dump().values())
+            else True
+        )
+    # Unidad de edad: peso documentado pero sin activar hasta contar con
+    # evidencia de pediatría independiente de la unidad que falta.
     return [name for name, value in fields.items() if is_missing(value)]
 
 
@@ -72,7 +76,7 @@ def confidence_score(
     data: DatosExtraidos,
     document_type: TipoDocumento | None = None,
 ) -> float:
-    """Score provisional de extracción: base fija 1 menos ausencias, en [0, 1]."""
+    """Score de completitud con pesos de Datos: base fija 1 menos ausencias, en [0, 1]."""
     # EXTRACCIÓN: cálculo local posterior a Pydantic; no añade llamadas al LLM.
     # La base fija evita descontar otra vez un score de una ejecución anterior.
     # Este indicador de completitud no mide exactitud clínica ni decide el destino.

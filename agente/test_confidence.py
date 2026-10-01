@@ -1,6 +1,6 @@
 # PRUEBAS AUTOMÁTICAS: se conservan para detectar regresiones de la extracción.
 # Usan datos ficticios y un LLM simulado; no consumen API ni prueban el nodo final.
-# Las expectativas numéricas deberán actualizarse cuando Datos confirme los pesos.
+# Pesos del PDF de Datos, páginas 10-11; condiciones temporales documentadas.
 import unittest
 from unittest.mock import Mock, patch
 
@@ -11,11 +11,11 @@ from schemas import Clasificacion, DatosExtraidos, TipoDocumento
 
 def complete_data(**patient):
     return DatosExtraidos(
-        paciente={"nombre": "Ana Ejemplo", "edad": 35, **patient},
+        paciente={"nombre": "Ana Ejemplo", "edad": 35, "sexo": "F", **patient},
         medico_solicitante={"nombre": "Dra. Prueba"},
         diagnostico_principal="Diagnóstico ficticio",
         estudio_realizado="Estudio ficticio",
-        medicamentos=[{"nombre": "Medicamento ficticio", "dosis": "10 mg"}],
+        medicamentos=[{"nombre": "Medicamento ficticio", "dosis": "10 mg", "frecuencia_diaria": "una vez al día"}],
     )
 
 
@@ -32,9 +32,9 @@ class ConfidenceTests(unittest.TestCase):
         # Cada caso se comprueba tanto por respuesta estructurada como por fallback.
         cases = [
             ({}, 1.0, []),
-            ({"nombre": "Desconocido"}, 0.85, ["paciente.nombre"]),
-            ({"edad": None}, 0.90, ["paciente.edad"]),
-            ({"nombre": "Desconocido", "edad": None}, 0.75,
+            ({"nombre": "Desconocido"}, 0.70, ["paciente.nombre"]),
+            ({"edad": None}, 0.85, ["paciente.edad"]),
+            ({"nombre": "Desconocido", "edad": None}, 0.55,
              ["paciente.nombre", "paciente.edad"]),
         ]
         for patient, extraction_score, missing in cases:
@@ -61,54 +61,83 @@ class ConfidenceTests(unittest.TestCase):
     def test_missing_text_markers_and_newborn_age(self):
         for name in ("", "  ", " DESCONOCIDO ", "null", "No consignado"):
             with self.subTest(name=name):
-                self.assertEqual(confidence_score(complete_data(nombre=name, edad=0)), 0.85)
+                self.assertEqual(confidence_score(complete_data(nombre=name, edad=0)), 0.70)
         self.assertEqual(confidence_score(complete_data(edad=0)), 1.0)
 
-    def test_clinical_fields_accumulate_and_optional_fields_stay_optional(self):
-        data = DatosExtraidos(paciente={"nombre": "Ana", "edad": 35})
-        self.assertEqual(confidence_score(data), 0.70)
-        self.assertEqual(missing_relevant_fields(data), [
-            "medico_solicitante.nombre", "diagnostico_principal",
-        ])
-        self.assertEqual(confidence_score(data, TipoDocumento.RECETA_MEDICA), 0.55)
-        for kind in (TipoDocumento.INFORME_ESTUDIO, TipoDocumento.INFORME_LABORATORIO):
-            self.assertEqual(confidence_score(data, kind), 0.60)
-        self.assertEqual(confidence_score(data, TipoDocumento.EPICRISIS), 0.70)
+    def test_pdf_weights(self):
+        from confidence import MISSING_FIELD_PENALTIES
+        self.assertEqual(dict(MISSING_FIELD_PENALTIES), {
+            "paciente.nombre": .30, "medicamentos_o_dosis": .30,
+            "paciente.unidad_edad": .30, "diagnostico_o_cie10": .15,
+            "paciente.edad": .15, "signos_vitales": .10,
+            "paciente.sexo": .05, "frecuencia_diaria": .05,
+        })
 
-    def test_empty_lists_do_not_count_as_medication_or_dose(self):
-        for empty in (None, [], [{"nombre": "  "}, {"nombre": "Desconocido", "dosis": "10 mg"}]):
-            data = complete_data()
-            data = DatosExtraidos.model_validate({**data.model_dump(), "medicamentos": empty})
-            self.assertEqual(confidence_score(data, TipoDocumento.RECETA_MEDICA), 0.85)
-
-    def test_doses_expected_when_medication_present(self):
+    def test_diagnosis_or_code_is_sufficient(self):
         data = complete_data()
-        data.medicamentos[0].dosis = None
-        self.assertEqual(confidence_score(data, TipoDocumento.EPICRISIS), 0.95)
-
-    def test_partial_doses_apply_one_penalty(self):
-        for missing in (None, "", "No consignado"):
-            data = complete_data()
-            data = DatosExtraidos.model_validate({
-                **data.model_dump(),
-                "medicamentos": [
-                    {"nombre": "A", "dosis": "10 mg"},
-                    {"nombre": "B", "dosis": missing},
-                    {"nombre": "C", "dosis": None},
-                ],
-            })
-            self.assertEqual(missing_relevant_fields(data), ["dosis"])
-            self.assertEqual(confidence_score(data), 0.95)
-
-    def test_new_optional_fields_do_not_penalize(self):
-        data = complete_data(unidad_edad=None, documento_identidad=None, sexo=None)
-        self.assertIsNone(data.signos_vitales)
+        data.diagnostico_principal = None
+        self.assertEqual(confidence_score(data), .85)
+        data.cie10_sugerido = "J30.4"
         self.assertEqual(confidence_score(data), 1.0)
 
-    def test_empty_doctor_name_is_missing(self):
+    def test_doctor_and_study_no_longer_penalize(self):
         data = complete_data()
-        data.medico_solicitante.nombre = "  "
-        self.assertEqual(confidence_score(data), 0.90)
+        data.medico_solicitante = None
+        data.estudio_realizado = None
+        for kind in TipoDocumento:
+            self.assertEqual(confidence_score(data, kind), 1.0)
+
+    def test_prescription_group_penalty_once(self):
+        for meds in (None, [], [{"nombre": "Desconocido", "dosis": None}],
+                     [{"nombre": "A"}, {"nombre": "B"}]):
+            with self.subTest(meds=meds):
+                data = DatosExtraidos.model_validate({**complete_data().model_dump(), "medicamentos": meds})
+                self.assertEqual(confidence_score(data, TipoDocumento.RECETA_MEDICA), .65)
+                self.assertEqual(missing_relevant_fields(data, TipoDocumento.RECETA_MEDICA),
+                                 ["medicamentos_o_dosis", "frecuencia_diaria"])
+                self.assertEqual(confidence_score(data, TipoDocumento.EPICRISIS), 1.0)
+                self.assertEqual(confidence_score(data), 1.0)
+
+    def test_missing_dose_and_frequency_are_separate_categories(self):
+        data = complete_data()
+        data.medicamentos[0].dosis = None
+        self.assertEqual(confidence_score(data, TipoDocumento.RECETA_MEDICA), .70)
+        data.medicamentos[0].dosis = "10 mg"
+        data.medicamentos[0].frecuencia_diaria = None
+        self.assertEqual(confidence_score(data, TipoDocumento.RECETA_MEDICA), .95)
+
+    def test_partial_medication_list_is_not_hidden_by_complete_entry(self):
+        data = DatosExtraidos.model_validate({**complete_data().model_dump(), "medicamentos": [
+            {"nombre": "A", "dosis": "10 mg", "frecuencia_diaria": "diaria"},
+            {"nombre": "B", "dosis": "No consignado", "frecuencia_diaria": "diaria"},
+        ]})
+        self.assertEqual(confidence_score(data, TipoDocumento.RECETA_MEDICA), .70)
+
+    def test_vital_sign_completeness(self):
+        from schemas import SignosVitales
+        data = complete_data()
+        self.assertEqual(confidence_score(data), 1.0)  # Aplicabilidad desconocida.
+        data.signos_vitales = SignosVitales()
+        self.assertEqual(confidence_score(data), .90)
+        data.signos_vitales = SignosVitales(temperatura=37, frecuencia_cardiaca=80,
+            frecuencia_respiratoria=16, presion_arterial="120/80", saturacion_oxigeno=98)
+        self.assertEqual(confidence_score(data), 1.0)
+        data.signos_vitales.presion_arterial = None
+        self.assertEqual(confidence_score(data), .90)
+
+    def test_missing_sex_uses_only_table_baseline(self):
+        self.assertEqual(confidence_score(complete_data(sexo=None)), .95)
+
+    def test_pending_identity_and_pediatric_conditions(self):
+        data = complete_data(unidad_edad=None, documento_identidad=None)
+        self.assertEqual(confidence_score(data), 1.0)
+        data.paciente.nombre = "Desconocido"
+        data.paciente.documento_identidad = "ABC123456"
+        self.assertEqual(confidence_score(data), .70)  # Mantener regla acordada de nombre.
+
+    def test_cumulative_penalties_clamp_at_zero(self):
+        data = DatosExtraidos(paciente={"nombre": "Desconocido"}, signos_vitales={})
+        self.assertEqual(confidence_score(data, TipoDocumento.RECETA_MEDICA), 0.0)
 
     def test_extraction_without_classification(self):
         data = complete_data(nombre="Desconocido", edad=None)
@@ -116,7 +145,7 @@ class ConfidenceTests(unittest.TestCase):
         llm.with_structured_output.return_value.invoke.return_value = data
         with patch("llm_provider.get_llm", return_value=llm):
             result = extraction_node({"document_text": "Documento ficticio"})
-        self.assertEqual(result["extraction_confidence_score"], 0.75)
+        self.assertEqual(result["extraction_confidence_score"], 0.55)
         self.assertEqual(result["missing_critical_fields"], ["paciente.nombre", "paciente.edad"])
 
 
