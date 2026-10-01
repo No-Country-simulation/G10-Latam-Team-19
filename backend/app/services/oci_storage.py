@@ -181,6 +181,54 @@ class OCIStorageService:
             object_name=ruta_objeto,
         )
 
+    def buscar_documento_triage(self, documento_id: str) -> tuple[str, dict[str, Any]] | None:
+        """
+        Busca un documento de triaje en OCI en orden de prioridad:
+        1. /validados/
+        2. /procesados/
+        3. /auditoria_humana/
+        Devuelve (ruta_objeto, dict_contenido) o None si no existe.
+        """
+        rutas_candidatas = [
+            f"{CarpetaOCI.VALIDADOS.value}/{documento_id}.json",
+            f"{CarpetaOCI.PROCESADOS.value}/{documento_id}.json",
+            f"{CarpetaOCI.AUDITORIA_HUMANA.value}/{documento_id}.json",
+        ]
+        for ruta in rutas_candidatas:
+            try:
+                data = self.descargar_json(ruta)
+                return ruta, data
+            except Exception:
+                continue
+
+        # Si no se encontró por ruta directa, intentar listar si estaba en alguna subcarpeta
+        try:
+            objetos = self.listar_objetos()
+            for obj in objetos:
+                if obj.endswith(f"/{documento_id}.json") and not obj.startswith(f"{CarpetaOCI.RECIBIDOS.value}/"):
+                    data = self.descargar_json(obj)
+                    return obj, data
+        except Exception:
+            pass
+
+        return None
+
+    def mover_a_validados(self, documento_id: str, contenido: dict[str, Any]) -> str:
+        """
+        Guarda el documento en /validados/ y remueve versiones previas en /auditoria_humana/ si existieran.
+        """
+        ruta_validado = self.guardar_json(
+            documento_id=documento_id,
+            contenido=contenido,
+            estado=EstadoDocumento.VALIDADO,
+        )
+        try:
+            ruta_auditoria = f"{CarpetaOCI.AUDITORIA_HUMANA.value}/{documento_id}.json"
+            self.eliminar_objeto(ruta_auditoria)
+        except Exception:
+            pass
+        return ruta_validado
+
 
 _service: OCIStorageService | None = None
 

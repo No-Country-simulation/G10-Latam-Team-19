@@ -6,7 +6,11 @@ Backend para el pipeline autónomo de triaje, extracción y enrutamiento intelig
 
 ## 🎯 Objetivos y Estado Actual
 
-- **Endpoint Autónomo:** `POST /triage` recibe `DocumentoClinicoRequest` y responde con una estructura tipada `TriageResponse` mockeada, permitiendo al resto del equipo (Frontend / Datos / Agente) trabajar e integrarse sin bloqueos.
+- **Endpoints Autónomos para Frontend (Next.js):**
+  - `POST /triage`: Recibe `DocumentoClinicoRequest`, persiste el crudo en `/recibidos/`, clasifica/extrae entidades y responde con `TriageResponse`.
+  - `GET /triage`: Devuelve la lista de documentos de triaje para la vista `/historial` de Frontend.
+  - `GET /triage/{id}`: Devuelve el detalle del documento procesado para la ruta dinámica `/triaje/[id]`.
+- **CORS Habilitado:** Configurado para comunicarse con el servidor de desarrollo de Next.js (`http://localhost:3000`).
 - **Persistencia en OCI Object Storage:**
   - `/recibidos/`: Guarda el documento crudo apenas ingresa al sistema.
   - `/procesados/`: Almacena el JSON con el resultado de triaje procesado.
@@ -103,34 +107,25 @@ El backend estará disponible en:
 
 ---
 
-## 🧪 Cómo Probar el Endpoint `POST /triage`
+## 📡 Endpoints Disponibles para Frontend
 
-### Opción A: Desde Swagger UI (`/docs`)
-1. Abre en tu navegador `http://localhost:8000/docs`.
-2. Expande el endpoint `POST /triage`.
-3. Haz clic en **Try it out**.
-4. Envía el siguiente JSON de prueba:
-   ```json
-   {
-     "documento_id": "DOC-CLIN-2026-8942",
-     "tipo_archivo": "TEXTO",
-     "documento_texto": "Tomografia de Torax con contraste. Se evidencia tromboembolismo pulmonar agudo en rama principal derecha.",
-     "canal_origen": "Guardia_Emergencias"
-   }
-   ```
-5. Haz clic en **Execute** y verifica la respuesta `200 OK` con el modelo `TriageResponse`.
+### 1. `POST /triage` (Procesar documento clínico)
+- **Cuerpo (Request):**
+  ```json
+  {
+    "documento_id": "DOC-CLIN-2026-8942",
+    "tipo_archivo": "TEXTO",
+    "documento_texto": "Tomografia de Torax con contraste. Hallazgo critico de TEP agudo.",
+    "canal_origen": "Guardia_Emergencias"
+  }
+  ```
+- **Respuesta:** `TriageResponse` con `clasificacion`, `datos_extraidos` (paciente con unidad de edad, signos vitales, medicamentos), `decision_enrutamiento`, `almacenamiento_oci` y `canal_origen`.
 
-### Opción B: Desde Terminal (cURL / PowerShell)
-```powershell
-curl -X POST "http://localhost:8000/triage" `
-     -H "Content-Type: application/json" `
-     -d '{
-       "documento_id": "DOC-CLIN-2026-8942",
-       "tipo_archivo": "TEXTO",
-       "documento_texto": "Tomografia de Torax con contraste. Se evidencia tromboembolismo pulmonar agudo en rama principal derecha.",
-       "canal_origen": "Guardia_Emergencias"
-     }'
-```
+### 2. `GET /triage` (Historial de documentos - `/historial`)
+- **Respuesta:** `list[TriageResponse]` (devuelve directamente la lista de documentos de triaje).
+
+### 3. `GET /triage/{documento_id}` (Detalle de documento - `/triaje/[id]`)
+- **Respuesta:** `TriageResponse` del documento especificado.
 
 ---
 
@@ -140,7 +135,7 @@ curl -X POST "http://localhost:8000/triage" `
 app/
 ├── schemas.py           # Schemas oficiales Pydantic (DocumentoClinicoRequest, TriageResponse, Enums)
 ├── config.py            # Gestión centralizada de configuración mediante Settings
-├── main.py              # Aplicación FastAPI, CORS y definición de endpoint POST /triage
+├── main.py              # Aplicación FastAPI, CORS y endpoints (POST /triage, GET /triage, GET /triage/{id})
 └── services/
     └── oci_storage.py   # Servicio de integración con OCI Object Storage y prefijos
 ```
