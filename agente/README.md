@@ -130,8 +130,18 @@ Se consideran ausentes `None`, texto vacío, marcadores normalizados definidos
 en `MISSING_TEXT_VALUES` (incluido `Desconocido`) y listas sin valores útiles.
 La edad cero sí cuenta como presente. `missing_critical_fields` registra nombre
 y edad; `missing_relevant_fields` explica todos los descuentos aplicables.
-La política verifica presencia, no exactitud clínica ni correspondencia entre
-cada medicamento y su dosis.
+La política verifica presencia, no exactitud clínica. Cada medicamento contiene
+`nombre`, `dosis` y `frecuencia_diaria`; ya no se usan listas separadas de dosis.
+Se aplica un único descuento de 0.05 si falta alguna dosis de los medicamentos
+con nombre útil (o si una receta no contiene medicamentos útiles). La etiqueta
+`dosis` en `missing_relevant_fields` se conserva para compatibilidad con el estado.
+Los medicamentos con nombre vacío o desconocido no cuentan como presentes.
+
+La extracción incluye `signos_vitales`, `unidad_edad`, `sexo` y
+`documento_identidad` según el schema de Datos. Estos campos, la frecuencia
+diaria, la matrícula y el CIE-10 siguen siendo opcionales sin nuevos descuentos.
+El prompt solicita null para datos ausentes o inválidos; Pydantic valida ambas
+rutas de respuesta. El nodo respeta el límite de tokens del proveedor.
 
 Con los demás datos relevantes completos:
 

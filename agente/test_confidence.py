@@ -15,8 +15,7 @@ def complete_data(**patient):
         medico_solicitante={"nombre": "Dra. Prueba"},
         diagnostico_principal="Diagnóstico ficticio",
         estudio_realizado="Estudio ficticio",
-        medicamentos=["Medicamento ficticio"],
-        dosis=["Dosis ficticia"],
+        medicamentos=[{"nombre": "Medicamento ficticio", "dosis": "10 mg"}],
     )
 
 
@@ -77,16 +76,34 @@ class ConfidenceTests(unittest.TestCase):
         self.assertEqual(confidence_score(data, TipoDocumento.EPICRISIS), 0.70)
 
     def test_empty_lists_do_not_count_as_medication_or_dose(self):
-        for empty in (None, [], ["  ", "Desconocido"]):
+        for empty in (None, [], [{"nombre": "  "}, {"nombre": "Desconocido", "dosis": "10 mg"}]):
             data = complete_data()
-            data.medicamentos = empty
-            data.dosis = empty
+            data = DatosExtraidos.model_validate({**data.model_dump(), "medicamentos": empty})
             self.assertEqual(confidence_score(data, TipoDocumento.RECETA_MEDICA), 0.85)
 
     def test_doses_expected_when_medication_present(self):
         data = complete_data()
-        data.dosis = None
+        data.medicamentos[0].dosis = None
         self.assertEqual(confidence_score(data, TipoDocumento.EPICRISIS), 0.95)
+
+    def test_partial_doses_apply_one_penalty(self):
+        for missing in (None, "", "No consignado"):
+            data = complete_data()
+            data = DatosExtraidos.model_validate({
+                **data.model_dump(),
+                "medicamentos": [
+                    {"nombre": "A", "dosis": "10 mg"},
+                    {"nombre": "B", "dosis": missing},
+                    {"nombre": "C", "dosis": None},
+                ],
+            })
+            self.assertEqual(missing_relevant_fields(data), ["dosis"])
+            self.assertEqual(confidence_score(data), 0.95)
+
+    def test_new_optional_fields_do_not_penalize(self):
+        data = complete_data(unidad_edad=None, documento_identidad=None, sexo=None)
+        self.assertIsNone(data.signos_vitales)
+        self.assertEqual(confidence_score(data), 1.0)
 
     def test_empty_doctor_name_is_missing(self):
         data = complete_data()

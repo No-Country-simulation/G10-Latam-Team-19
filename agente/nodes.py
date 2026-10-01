@@ -64,9 +64,8 @@ def extraction_node(state: AgentState) -> dict:
     document_text = state["document_text"]
     messages = build_extraction_prompt(document_text=document_text)
     llm = get_llm()
-    # TEMPORAL: límite usado en pruebas con Groq; hoy se aplica a cualquier proveedor.
-    # Revisarlo antes de usar documentos largos: puede truncar el JSON de respuesta.
-    llm.max_tokens = 450
+    # Respetar la configuración del proveedor: el contrato anidado puede
+    # superar el antiguo límite temporal de 450 tokens.
 
     # EXTRACCIÓN: ruta principal; Pydantic valida el contrato antes de calcular completitud.
     # Capa 1: respuesta estructurada.

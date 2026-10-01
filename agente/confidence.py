@@ -51,10 +51,19 @@ def missing_relevant_fields(
     # No exigir estudios ni tratamiento en documentos donde pueden no aplicar.
     if document_type in STUDY_DOCUMENT_TYPES:
         fields["estudio_realizado"] = data.estudio_realizado
+    medications = [
+        medication for medication in (data.medicamentos or [])
+        if not is_missing(medication.nombre)
+    ]
     if document_type == TipoDocumento.RECETA_MEDICA:
-        fields["medicamentos"] = data.medicamentos
-    if document_type == TipoDocumento.RECETA_MEDICA or not is_missing(data.medicamentos):
-        fields["dosis"] = data.dosis
+        fields["medicamentos"] = medications
+    if document_type == TipoDocumento.RECETA_MEDICA or medications:
+        # Un único descuento si falta alguna dosis, sin multiplicar el peso
+        # por el número de medicamentos. Una dosis sin nombre no aporta datos.
+        fields["dosis"] = (
+            None if not medications or any(is_missing(m.dosis) for m in medications)
+            else True
+        )
     # Matrícula y CIE-10 siguen siendo opcionales sin penalización.
     return [name for name, value in fields.items() if is_missing(value)]
 
