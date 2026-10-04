@@ -1,0 +1,87 @@
+{
+  "_fuente": "Proyecto alura_Data_UmbralScoreyReglas.pdf, pp. 8-13 (Score de priorizacion nodo2 y Criterios de Separacion)",
+  "_pendiente_michelle": [
+    "Huecos sin banda: FC adulto 100-110, temperatura adulto 36-37.5 a 38.5, SpO2 94-95",
+    "Solapamiento: FR adulto 20 figura en Prioritario (20-30) y en Rutina (12-20)",
+    "Pediatria en anios: el PDF solo define rangos para meses/dias",
+    "SpO2 y presion arterial pediatricas: no definidas (se copia SpO2 adulto)",
+    "Presion arterial adulto: no hay umbral Urgente",
+    "Palabras clave 'dolor muscular' y 'vision borrosa' figuran como Urgente: confirmar",
+    "Citostaticos/Quimioterapia: el PDF no da nombres de farmacos, solo la familia",
+    "Prioritario sin medicamentos (ej. fractura): hoy el destino es Farmacia, el PDF no lo define",
+    "Farmacia exige score >= 0.90 (PDF p.13): esta funcion no recibe el score, debe aplicarlo el nodo final",
+    "Precedencia entre score < 0.75 (revision humana) y urgencia clara: no definida"
+  ],
+
+  "orden_gravedad": ["Rutina", "Prioritario", "Urgente"],
+
+  "destinos": {
+    "urgente": "Cola_Emergencia_Medica",
+    "prioritario": "Farmacia_Hospitalaria",
+    "prioritario_con_restringidos": "Auditoria_Autorizaciones",
+    "rutina": "Historia_Clinica_Electronica"
+  },
+
+  "palabras_clave": {
+    "urgente": [
+      "infarto", "iam", "paro", "shock", "sepsis", "tep", "acv", "ictus",
+      "hemorragia masiva", "inconsciente", "dificultad respiratoria severa",
+      "politraumatismo", "dolor muscular", "vision borrosa", "escala de glasgow <8"
+    ],
+    "prioritario": [
+      "fractura cerrada", "dolor agudo", "infeccion", "fiebre persistente",
+      "herida suturable", "colico renal", "colico biliar", "crisis hipertensiva",
+      "deshidratacion moderada"
+    ],
+    "rutina": [
+      "control", "chequeo", "aptitud fisica", "evolucion favorable",
+      "examen de rutina", "laboratorio normal", "renovacion de receta",
+      "alta medica", "asintomatico"
+    ]
+  },
+
+  "signos_vitales": {
+    "saturacion_oxigeno": {
+      "adulto":     {"urgente": [{"lt": 90}], "prioritario": [{"between": [90, 94]}]},
+      "pediatrico": {"urgente": [{"lt": 90}], "prioritario": [{"between": [90, 94]}]}
+    },
+    "frecuencia_cardiaca": {
+      "adulto":     {"urgente": [{"lt": 40}, {"gt": 130}], "prioritario": [{"between": [110, 130]}]},
+      "pediatrico": {"urgente": [{"lt": 80}, {"gt": 180}], "prioritario": [{"between": [160, 180]}]}
+    },
+    "frecuencia_respiratoria": {
+      "adulto":     {"urgente": [{"lt": 10}, {"gt": 30}], "prioritario": [{"between": [20, 30]}]},
+      "pediatrico": {"urgente": [{"gt": 50}], "prioritario": [{"between": [40, 50]}]}
+    },
+    "temperatura": {
+      "adulto":     {"urgente": [{"gt": 40.0}, {"lt": 35.0}], "prioritario": [{"between": [38.5, 40.0]}]},
+      "pediatrico": {"urgente": [{"gt": 38.0}], "prioritario": []}
+    },
+    "presion_arterial": {
+      "adulto": {
+        "urgente": {"sistolica": [], "diastolica": []},
+        "prioritario": {"sistolica": [{"gt": 180}], "diastolica": [{"gt": 110}]}
+      },
+      "pediatrico": {
+        "urgente": {"sistolica": [], "diastolica": []},
+        "prioritario": {"sistolica": [], "diastolica": []}
+      }
+    }
+  },
+
+  "medicamentos_restringidos": {
+    "opioides_y_estupefacientes": ["fentanilo", "morfina", "tramadol", "oxicodona"],
+    "anticoagulantes": ["heparina", "enoxaparina", "warfarina"],
+    "antimicrobianos_restringidos": ["meropenem", "vancomicina", "ceftriaxona"],
+    "insulinas": ["insulina", "nph", "glargina"],
+    "psicotropicos_y_sedantes": ["diazepam", "midazolam", "clonazepam"],
+    "citostaticos_quimioterapia": ["citostatico", "citostaticos", "quimioterapia"]
+  },
+
+  "medicamentos_comunes": {
+    "analgesicos_antipireticos": ["paracetamol", "metamizol", "dipirona"],
+    "aines": ["ibuprofeno", "ketorolaco", "diclofenac"],
+    "protectores_gastricos_antiemeticos": ["omeprazol", "ondansetron", "metoclopramida"],
+    "soluciones_parenterales": ["suero fisiologico", "ringer lactato"]
+  }
+}
