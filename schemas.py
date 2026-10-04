@@ -87,7 +87,7 @@ class Clasificacion(BaseModel):
 
 
 class Paciente(BaseModel):
-    nombre: str
+    nombre: Optional[str] = None,
     edad: Optional[int] = Field(None, ge=0, le=130)
     unidad_edad: Optional[UnidadEdad] = Field(
         default=UnidadEdad.ANOS, 
@@ -102,7 +102,7 @@ class Paciente(BaseModel):
 
 
 class MedicoSolicitante(BaseModel):
-    nombre: str
+    nombre: Optional[str] = None
     matricula: Optional[str] = None
 
 
@@ -110,6 +110,25 @@ class MedicamentoPrescrito(BaseModel):
     nombre: str
     dosis: Optional[str] = None
     frecuencia_diaria: Optional[str] = None
+    via: Optional[ViaAdministracion] = Field(
+        None, 
+        description="Vía de administración normalizada. Si el texto dice 'por boca', mapear a 'Oral'."
+    )
+
+class ViaAdministracion(str, Enum):
+    ORAL = "Oral"
+    SUBLINGUAL = "Sublingual"
+    INTRAVENOSA = "Intravenosa (IV)"
+    INTRAMUSCULAR = "Intramuscular (IM)"
+    SUBCUTANEA = "Subcutanea (SC)"
+    INHALATORIA = "Inhalatoria"
+    TOPICA = "Topica"
+    OFTALMICA = "Oftalmica"
+    OTICA = "Otica"
+    RECTAL = "Rectal"
+    VAGINAL = "Vaginal"
+    ENTERAL = "Sonda Enteral"
+    OTRA = "Otra_No_Especificada"
 
 
 class SignosVitales(BaseModel):
@@ -177,7 +196,7 @@ class AlmacenamientoOCI(BaseModel):
 # --------------------
 
 class TriageResponse(BaseModel):
-    status: str = Field(default="procesado")
+    status: EstadoDocumento = Field(default=EstadoDocumento.PROCESADO)
     documento_id: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     clasificacion: Clasificacion
@@ -193,7 +212,7 @@ class TriageResponse(BaseModel):
 
 if __name__ == "__main__":
     ejemplo = {
-        "status": "procesado",
+        "status": EstadoDocumento.PROCESADO,
         "documento_id": "DOC-CLIN-2026-8942",
         "canal_origen": "Guardia_Emergencias",
         "clasificacion": {
