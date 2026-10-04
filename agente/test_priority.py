@@ -369,6 +369,14 @@ class EvaluatePriorityTests(unittest.TestCase):
         self.assertEqual(result["nivel_prioridad"], "Urgente")
         self.assertEqual(result["datos_faltantes"], ["paciente.unidad_edad"])
 
+    def test_medication_without_name_is_ignored(self):
+        data = {
+            "paciente": {"edad": 40, "unidad_edad": "años"},
+            "medicamentos": [{"nombre": None, "dosis": "5 mg"}, {"nombre": "Morfina"}],
+        }
+        result = evaluate_priority(data, CONFIG)
+        self.assertTrue(result["forzar_auditoria"])
+
     def test_does_not_modify_input(self):
         data = {
             "paciente": {"edad": 40, "unidad_edad": "años"},

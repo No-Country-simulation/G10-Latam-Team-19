@@ -151,7 +151,9 @@ def evaluate_vitals(
 
 def evaluate_priority(extracted_data: dict, config: dict) -> dict:
     patient = extracted_data.get("paciente") or {}
-    medication_names = [m["nombre"] for m in extracted_data.get("medicamentos") or []]
+    medication_names = [
+        m["nombre"] for m in extracted_data.get("medicamentos") or [] if m.get("nombre")
+    ]
 
     keywords = evaluate_keywords(extracted_data.get("diagnostico_principal"), config)
     vitals = evaluate_vitals(
