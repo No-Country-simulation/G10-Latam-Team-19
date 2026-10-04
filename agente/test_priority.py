@@ -390,8 +390,8 @@ class EvaluatePriorityTests(unittest.TestCase):
 
 
 class MichelleTestCases(unittest.TestCase):
-    """Casos de prueba del PDF de Datos (Nodo 2). Los fallos esperados quedan como
-    preguntas abiertas en _pendiente_michelle de priority_config.json."""
+    """Casos de prueba del PDF de Datos (Nodo 2). Los fallos esperados están registrados
+    en _pendiente_michelle y _pendiente_equipo de priority_config.json."""
 
     def evaluate(self, age, age_unit, diagnosis, vitals, medications=None):
         data = {
@@ -435,7 +435,7 @@ class MichelleTestCases(unittest.TestCase):
 
     @unittest.expectedFailure
     def test_case_3_expected_priority_level(self):
-        # Pendiente Michelle: ninguna regla detecta el 'dolor severo activo'.
+        # Requiere el LLM de apoyo (Jairo): ninguna regla detecta el 'dolor severo activo'.
         self.assertEqual(self.case_3()["nivel_prioridad"], "Prioritario")
 
     @unittest.expectedFailure
