@@ -1,0 +1,112 @@
+{
+  "_fuente": "Proyecto alura_Data_UmbralScoreyReglas (1).pdf, pp. 9-17 (Nodo 2, criterios de separacion, casos de prueba)",
+  "_pendiente_michelle": [
+    "Caso 5 (11 meses, 38.9 C): la regla de lactantes (> 38.0 Urgente) contradice el Prioritario esperado",
+    "Rutina con medicamentos comunes (ej. renovacion de receta): la matriz dice Historia Clinica, el diagrama dice Farmacia",
+    "Huecos adultos sin banda: FC 100-110, temperatura 35-36 y 37.5-38.5, SpO2 94-95",
+    "Huecos pediatria meses/dias: FC 80-100; solapamiento FR 40",
+    "Presion arterial: no hay umbral Urgente ni rangos pediatricos",
+    "Palabras clave 'dolor muscular' y 'vision borrosa' figuran como Urgente: confirmar",
+    "Citostaticos/Quimioterapia: el PDF no da nombres de farmacos, solo la familia"
+  ],
+  "_pendiente_equipo": [
+    "Caso 3 (fentanilo): ninguna regla detecta el 'dolor severo activo' y la funcion da Rutina; requiere el LLM de apoyo propuesto por Jairo, combinado con 'gana el mas grave'",
+    "Parte del score final y requires_human_review de confidence_node: sin responsable definido"
+  ],
+  "_limitaciones_conocidas": [
+    "Negaciones y antecedentes ('sin infarto', 'antecedente de infarto') suben a Urgente",
+    "Plurales y femeninos no coinciden ('infecciones', 'asintomatica')",
+    "Los medicamentos restringidos se buscan por nombre generico; las marcas comerciales no se detectan",
+    "Los medicamentos sin nombre se ignoran: se confia en que el Nodo 1 frene esos casos"
+  ],
+  "_decisiones_provisorias": [
+    "Urgente gana sobre el destino por contenido: Urgente con medicamentos va a Emergencia",
+    "Medicamento restringido fuerza Auditoria salvo que el caso sea Urgente",
+    "Prioritario sin medicamentos va a Historia Clinica (diagrama del Nodo 2)",
+    "Edad 0 con unidad 'años' se trata como pediatrico de 1 a 12 años",
+    "Farmacia exige score >= 0.90 (PDF p.13): esta funcion no recibe el score, debe aplicarlo el nodo final",
+    "Precedencia entre score < 0.75 (revision humana) y urgencia clara: no definida"
+  ],
+
+  "orden_gravedad": ["Rutina", "Prioritario", "Urgente"],
+
+  "edad_pediatrica_maxima_anos": 12,
+
+  "destinos": {
+    "emergencia": "Cola_Emergencia_Medica",
+    "farmacia": "Farmacia_Hospitalaria",
+    "auditoria": "Auditoria_Autorizaciones",
+    "historia_clinica": "Historia_Clinica_Electronica"
+  },
+
+  "palabras_clave": {
+    "urgente": [
+      "infarto", "iam", "paro", "shock", "sepsis", "tep", "acv", "ictus",
+      "hemorragia masiva", "inconsciente", "dificultad respiratoria severa",
+      "politraumatismo", "dolor muscular", "vision borrosa", "escala de glasgow <8"
+    ],
+    "prioritario": [
+      "fractura cerrada", "dolor agudo", "infeccion", "fiebre persistente",
+      "herida suturable", "colico renal", "colico biliar", "crisis hipertensiva",
+      "deshidratacion moderada"
+    ],
+    "rutina": [
+      "control", "chequeo", "aptitud fisica", "evolucion favorable",
+      "examen de rutina", "laboratorio normal", "renovacion de receta",
+      "alta medica", "asintomatico"
+    ]
+  },
+
+  "signos_vitales": {
+    "saturacion_oxigeno": {
+      "adulto":                {"urgente": [{"lt": 90}], "prioritario": [{"between": [90, 94]}]},
+      "pediatrico_anos":       {"urgente": [{"lt": 90}], "prioritario": [{"between": [90, 94]}]},
+      "pediatrico_meses_dias": {"urgente": [{"lt": 90}], "prioritario": [{"between": [90, 94]}]}
+    },
+    "frecuencia_cardiaca": {
+      "adulto":                {"urgente": [{"lt": 40}, {"gt": 130}], "prioritario": [{"between": [110, 130]}]},
+      "pediatrico_anos":       {"urgente": [{"lt": 60}, {"gt": 160}], "prioritario": [{"between": [121, 160]}, {"between": [60, 79]}]},
+      "pediatrico_meses_dias": {"urgente": [{"lt": 80}, {"gt": 180}], "prioritario": [{"between": [160, 180]}]}
+    },
+    "frecuencia_respiratoria": {
+      "adulto":                {"urgente": [{"lt": 10}, {"gt": 30}], "prioritario": [{"between": [20, 30]}]},
+      "pediatrico_anos":       {"urgente": [{"lt": 15}, {"gt": 40}], "prioritario": [{"between": [31, 40]}, {"between": [15, 19]}]},
+      "pediatrico_meses_dias": {"urgente": [{"gt": 50}], "prioritario": [{"between": [40, 50]}]}
+    },
+    "temperatura": {
+      "adulto":                {"urgente": [{"gt": 40.0}, {"lt": 35.0}], "prioritario": [{"between": [38.5, 40.0]}]},
+      "pediatrico_anos":       {"urgente": [{"gt": 40.0}, {"lt": 35.0}], "prioritario": [{"between": [38.5, 40.0]}]},
+      "pediatrico_meses_dias": {"urgente": [{"gt": 38.0}], "prioritario": []}
+    },
+    "presion_arterial": {
+      "adulto": {
+        "urgente": {"sistolica": [], "diastolica": []},
+        "prioritario": {"sistolica": [{"gt": 180}], "diastolica": [{"gt": 110}]}
+      },
+      "pediatrico_anos": {
+        "urgente": {"sistolica": [], "diastolica": []},
+        "prioritario": {"sistolica": [], "diastolica": []}
+      },
+      "pediatrico_meses_dias": {
+        "urgente": {"sistolica": [], "diastolica": []},
+        "prioritario": {"sistolica": [], "diastolica": []}
+      }
+    }
+  },
+
+  "medicamentos_restringidos": {
+    "opioides_y_estupefacientes": ["fentanilo", "morfina", "tramadol", "oxicodona"],
+    "anticoagulantes": ["heparina", "enoxaparina", "warfarina"],
+    "antimicrobianos_restringidos": ["meropenem", "vancomicina", "ceftriaxona"],
+    "insulinas": ["insulina", "nph", "glargina"],
+    "psicotropicos_y_sedantes": ["diazepam", "midazolam", "clonazepam"],
+    "citostaticos_quimioterapia": ["citostatico", "citostaticos", "quimioterapia"]
+  },
+
+  "medicamentos_comunes": {
+    "analgesicos_antipireticos": ["paracetamol", "metamizol", "dipirona"],
+    "aines": ["ibuprofeno", "ketorolaco", "diclofenac"],
+    "protectores_gastricos_antiemeticos": ["omeprazol", "ondansetron", "metoclopramida"],
+    "soluciones_parenterales": ["suero fisiologico", "ringer lactato"]
+  }
+}
