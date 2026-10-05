@@ -4,15 +4,16 @@
 #
 
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
 
 def get_llm():
     """
     Devuelve un cliente LLM listo para usar (interfaz de langchain),
     según la variable de entorno LLM_ENV.
-
-    TODO (equipo Agente): completar cada rama con el modelo real y su configuración
-                          (temperatura, max_tokens, etc.) una vez tengamos las API keys
-                          Por ahora son placeholders.
     """
     environ = os.getenv("LLM_ENV", "dev").lower()
 
