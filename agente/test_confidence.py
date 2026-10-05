@@ -28,14 +28,13 @@ def classification(score=0.95, kind=TipoDocumento.RECETA_MEDICA):
 
 class ConfidenceTests(unittest.TestCase):
     def test_four_cases_in_both_extraction_routes(self):
-        # Regla de Michelle: completo, sin nombre, sin edad y sin ambos.
         # Cada caso se comprueba tanto por respuesta estructurada como por fallback.
         cases = [
             ({}, 1.0, []),
-            ({"nombre": "Desconocido"}, 0.70, ["paciente.nombre"]),
+            ({"nombre": None}, 1.0, []),
             ({"edad": None}, 0.85, ["paciente.edad"]),
-            ({"nombre": "Desconocido", "edad": None}, 0.55,
-             ["paciente.nombre", "paciente.edad"]),
+            ({"nombre": None, "edad": None}, 0.85,
+             ["paciente.edad"]),
         ]
         for patient, extraction_score, missing in cases:
             for fallback in (False, True):
@@ -61,13 +60,13 @@ class ConfidenceTests(unittest.TestCase):
     def test_missing_text_markers_and_newborn_age(self):
         for name in ("", "  ", " DESCONOCIDO ", "null", "No consignado"):
             with self.subTest(name=name):
-                self.assertEqual(confidence_score(complete_data(nombre=name, edad=0)), 0.70)
+                self.assertEqual(confidence_score(complete_data(nombre=name, edad=0)), 1.0)
         self.assertEqual(confidence_score(complete_data(edad=0)), 1.0)
 
     def test_pdf_weights(self):
         from confidence import MISSING_FIELD_PENALTIES
         self.assertEqual(dict(MISSING_FIELD_PENALTIES), {
-            "paciente.nombre": .30, "medicamentos_o_dosis": .30,
+            "medicamentos_o_dosis": .30,
             "paciente.unidad_edad": .30, "diagnostico_o_cie10": .15,
             "paciente.edad": .15, "signos_vitales": .10,
             "paciente.sexo": .05, "frecuencia_diaria": .05,
@@ -131,22 +130,22 @@ class ConfidenceTests(unittest.TestCase):
     def test_pending_identity_and_pediatric_conditions(self):
         data = complete_data(unidad_edad=None, documento_identidad=None)
         self.assertEqual(confidence_score(data), 1.0)
-        data.paciente.nombre = "Desconocido"
+        data.paciente.nombre = None
         data.paciente.documento_identidad = "ABC123456"
-        self.assertEqual(confidence_score(data), .70)  # Mantener regla acordada de nombre.
+        self.assertEqual(confidence_score(data), 1.0)
 
     def test_cumulative_penalties_clamp_at_zero(self):
-        data = DatosExtraidos(paciente={"nombre": "Desconocido"}, signos_vitales={})
-        self.assertEqual(confidence_score(data, TipoDocumento.RECETA_MEDICA), 0.0)
+        data = DatosExtraidos(paciente={"nombre": None}, signos_vitales={})
+        self.assertEqual(confidence_score(data, TipoDocumento.RECETA_MEDICA), 0.2)
 
     def test_extraction_without_classification(self):
-        data = complete_data(nombre="Desconocido", edad=None)
+        data = complete_data(nombre=None, edad=None)
         llm = Mock()
         llm.with_structured_output.return_value.invoke.return_value = data
         with patch("llm_provider.get_llm", return_value=llm):
             result = extraction_node({"document_text": "Documento ficticio"})
-        self.assertEqual(result["extraction_confidence_score"], 0.55)
-        self.assertEqual(result["missing_critical_fields"], ["paciente.nombre", "paciente.edad"])
+        self.assertEqual(result["extraction_confidence_score"], 0.85)
+        self.assertEqual(result["missing_critical_fields"], ["paciente.edad"])
 
 
 if __name__ == "__main__":

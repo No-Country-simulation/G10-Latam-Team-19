@@ -1,4 +1,4 @@
-# PRUEBAS AUTOMÁTICAS: validación Pydantic, nombre ausente y fallback de extracción.
+# PRUEBAS AUTOMÁTICAS: validación Pydantic y fallback de extracción.
 # Se conservan como regresión; el proveedor se simula y no necesita credenciales.
 import unittest
 from unittest.mock import Mock, patch
@@ -53,11 +53,11 @@ class ExtractionTests(unittest.TestCase):
                     with self.assertRaises(RuntimeError):
                         extraction_node({"document_text": "Documento ficticio"})
 
-    def test_nombre_ausente(self):
+    def test_nombre_ausente_no_es_critico(self):
         llm = Mock()
         llm.with_structured_output.return_value.invoke.return_value = (
             DatosExtraidos(
-                paciente={"nombre": "Desconocido", "edad": 42}
+                paciente={"nombre": None, "edad": 42}
             )
         )
 
@@ -67,10 +67,8 @@ class ExtractionTests(unittest.TestCase):
             })
 
         self.assertIsInstance(result["extracted_data"], DatosExtraidos)
-        self.assertEqual(
-            result["missing_critical_fields"],
-            ["paciente.nombre"],
-        )
+        self.assertEqual(result["missing_critical_fields"], [])
+        self.assertEqual(result["extraction_confidence_score"], 1.0)
 
     def test_nombre_presente_con_fallback(self):
         llm = Mock()

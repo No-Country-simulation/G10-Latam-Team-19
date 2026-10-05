@@ -7,7 +7,6 @@ from schemas import DatosExtraidos, TipoDocumento
 # Fuente: Proyecto alura_Data_UmbralScoreyReglas.pdf, pp. 10-11.
 # Condiciones pendientes y decisiones temporales: PESOS_PENDIENTES.md.
 MISSING_FIELD_PENALTIES = MappingProxyType({
-    "paciente.nombre": 0.30,
     "medicamentos_o_dosis": 0.30,
     "paciente.unidad_edad": 0.30,  # Pendiente: señal explícita de pediatría.
     "diagnostico_o_cie10": 0.15,
@@ -16,7 +15,7 @@ MISSING_FIELD_PENALTIES = MappingProxyType({
     "paciente.sexo": 0.05,
     "frecuencia_diaria": 0.05,
 })
-# EXTRACCIÓN: normalizar marcadores evita contar "Desconocido" como dato presente.
+# EXTRACCIÓN: normalizar marcadores evita contar textos de ausencia como datos.
 MISSING_TEXT_VALUES = frozenset({
     "", "desconocido", "desconocida", "null", "none", "n/a",
     "no consta", "no consignado", "no consignada", "no informado", "no informada",
@@ -37,9 +36,9 @@ def is_missing(value: object) -> bool:
 def missing_relevant_fields(
     data: DatosExtraidos, document_type: TipoDocumento | None = None,
 ) -> list[str]:
-    # Mantener nombre y edad como críticos, sin inferirlos del documento.
+    # La ausencia del nombre no penaliza: algunos documentos no identifican
+    # nominalmente al paciente. La edad sí conserva su peso propio.
     fields = {
-        "paciente.nombre": data.paciente.nombre,
         "paciente.edad": data.paciente.edad,
         "diagnostico_o_cie10": (
             None if is_missing(data.diagnostico_principal) and is_missing(data.cie10_sugerido)

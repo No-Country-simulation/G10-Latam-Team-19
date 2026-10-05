@@ -96,7 +96,6 @@ Agregar las ramas condicionales para los distintos destinos del flujo, incluyend
 4. El mapeo entre clasificación, score y destino.
 5. Las condiciones que obligan a derivar un documento a revisión humana.
 
-
 ## Regla de confianza por datos faltantes
 
 Pesos de `Proyecto alura_Data_UmbralScoreyReglas.pdf`, páginas 10-11.
@@ -106,7 +105,6 @@ El score de extracción mide completitud, no exactitud clínica. Se calcula desd
 
 | Categoría | Descuento | Aplicación actual |
 | --- | --- | --- |
-| Nombre | 0.30 | Siempre, conservando la regla acordada |
 | Edad numérica | 0.15 | Siempre, conservando la regla acordada; cero es válido |
 | Diagnóstico o CIE-10 | 0.15 | Si faltan ambos |
 | Medicamento o dosis | 0.30 | En receta, si falta cualquiera en alguna entrada |
@@ -115,15 +113,13 @@ El score de extracción mide completitud, no exactitud clínica. Se calcula desd
 | Sexo | 0.05 | Descuento base por ausencia; no se infiere dependencia clínica |
 | Unidad de edad pediátrica | 0.30 | Peso registrado, aplicación pendiente de señal de pediatría |
 
-Nombre y edad ausentes se conservan en `missing_critical_fields`. Todas las
-categorías aplicadas aparecen en `missing_relevant_fields`; las etiquetas de
+Todas las categorías aplicadas aparecen en `missing_relevant_fields`; las etiquetas de
 medicamentos/dosis y diagnóstico cambiaron para reflejar penalizaciones agrupadas.
 No se penaliza médico ni estudio, porque no figuran en la tabla del PDF.
 No se añade vía al schema. Las decisiones temporales y preguntas para Datos
 están en [PESOS_PENDIENTES.md](PESOS_PENDIENTES.md).
 
-Con las demás categorías completas: sin nombre 0.70, sin edad 0.85 y sin ambos
-0.55. La extracción conserva `extraction_confidence_score`; no modifica el score
+La extracción conserva `extraction_confidence_score`; no modifica el score
 LLM de clasificación ni implementa el filtro, la prioridad o el enrutamiento.
 Los pesos están alineados al PDF, pero su aplicación clínica completa requiere
 resolver los pendientes documentados.

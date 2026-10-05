@@ -133,7 +133,7 @@ def extraction_node(state: AgentState) -> dict:
         "extracted_data": extracted_data,
         "missing_critical_fields": [
             field for field in missing_fields
-            if field in ("paciente.nombre", "paciente.edad")
+            if field == "paciente.edad"
         ],
         "missing_relevant_fields": missing_fields,
         "extraction_confidence_score": confidence_score(extracted_data, document_type),

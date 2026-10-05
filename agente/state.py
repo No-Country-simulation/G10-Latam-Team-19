@@ -13,7 +13,7 @@ class AgentState(TypedDict, total=False):
 
     # --- Completado en el nodo Extracción
     extracted_data: Optional[DatosExtraidos]
-    # EXTRACCIÓN: nombre y edad ausentes, destacados por la instrucción de Michelle.
+    # EXTRACCIÓN: La falta de algunos datos penaliza el score de confianza.
     missing_critical_fields: Optional[list[str]]
     # EXTRACCIÓN: detalle de todos los campos que explican los descuentos aplicados.
     missing_relevant_fields: Optional[list[str]]
