@@ -5,10 +5,12 @@ Backend para triaje, extracción y enrutamiento inteligente de documentos clíni
 Conectado con OCI Object Storage y listo para consumo directo desde Next.js.
 
 Endpoints:
-    - POST /triage                -> Procesa y clasifica un documento clínico.
-    - GET  /triage                -> Retorna el historial de documentos procesados (para /historial).
-    - GET  /triage/{documento_id} -> Obtiene el detalle de triaje de un documento (para /triaje/[id]).
-    - GET  /health                -> Healthcheck del servicio.
+    - POST /triage                          -> Procesa y clasifica un documento clínico.
+    - GET  /triage                          -> Retorna el historial de documentos procesados (para /historial).
+    - GET  /triage/{documento_id}           -> Obtiene el detalle de triaje de un documento (para /triaje/[id]).
+    - POST /triage/{documento_id}/aprobar   -> Aprueba un doc en cola de auditoría, lo mueve a /validados/.
+    - POST /triage/{documento_id}/rechazar  -> Rechaza un doc en cola de auditoría (queda marcado, sin mover).
+    - GET  /health                          -> Healthcheck del servicio.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from app.config import get_settings
 from app.schemas import (
@@ -243,6 +246,16 @@ _DOCUMENTOS_STORE: dict[str, TriageResponse] = {
 }
 
 
+class RevisionHumanaRequest(BaseModel):
+    """
+    Body opcional para aprobar/rechazar. Definido acá (no en schemas.py)
+    porque es un detalle del endpoint de auditoría, no parte del contrato
+    compartido con Agente/Frontend.
+    """
+    comentario: str | None = None
+    revisor: str | None = None
+
+
 @app.get("/health", tags=["Health"])
 def health_check():
     """Endpoint de salud para monitorización del servicio."""
@@ -398,3 +411,122 @@ def obtener_documento_por_id(documento_id: str) -> TriageResponse:
         status_code=status.HTTP_404_NOT_FOUND,
         detail=f"Documento clínico con ID '{documento_id}' no encontrado.",
     )
+
+
+def _obtener_doc_en_auditoria(documento_id: str) -> TriageResponse:
+    """Busca el documento y valida que esté en cola de auditoría humana."""
+    if documento_id not in _DOCUMENTOS_STORE:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Documento clínico con ID '{documento_id}' no encontrado.",
+        )
+    doc = _DOCUMENTOS_STORE[documento_id]
+    if not doc.decision_enrutamiento.requiere_auditoria_humana:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El documento '{documento_id}' no está en cola de auditoría humana.",
+        )
+    return doc
+
+
+@app.post(
+    "/triage/{documento_id}/aprobar",
+    response_model=TriageResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Auditoría Humana"],
+    summary="Aprobar un documento en cola de auditoría humana",
+)
+def aprobar_documento(documento_id: str, revision: RevisionHumanaRequest | None = None) -> TriageResponse:
+    """
+    Aprueba un documento que estaba pendiente de revisión: lo mueve de
+    /auditoria_humana/ a /validados/ en OCI y actualiza su estado.
+    No recalcula clasificación, score ni enrutamiento — solo registra la
+    decisión que ya tomó el revisor humano al llamar a este endpoint.
+    """
+    doc = _obtener_doc_en_auditoria(documento_id)
+
+    doc.status = "validado"
+    doc.decision_enrutamiento.requiere_auditoria_humana = False
+    if revision and revision.comentario:
+        doc.decision_enrutamiento.justificacion_enrutamiento += (
+            f" | Aprobado por revisor humano: {revision.comentario}"
+        )
+
+    try:
+        oci_service = get_oci_service()
+        contenido = {
+            "status": doc.status,
+            "documento_id": doc.documento_id,
+            "canal_origen": doc.canal_origen,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "clasificacion": doc.clasificacion.model_dump(),
+            "datos_extraidos": doc.datos_extraidos.model_dump(),
+            "decision_enrutamiento": doc.decision_enrutamiento.model_dump(),
+            "revision_humana": revision.model_dump() if revision else None,
+        }
+        ruta_objeto = oci_service.mover_a_validados(documento_id, contenido)
+        doc.almacenamiento_oci = AlmacenamientoOCI(
+            bucket=get_settings().OCI_BUCKET,
+            ruta_objeto=ruta_objeto,
+            status_backup="exito",
+        )
+    except Exception as exc:
+        logger.warning("No se pudo mover '%s' a /validados/ en OCI (%s).", documento_id, exc)
+        if doc.almacenamiento_oci:
+            doc.almacenamiento_oci.status_backup = "fallido"
+
+    _DOCUMENTOS_STORE[documento_id] = doc
+    return doc
+
+
+@app.post(
+    "/triage/{documento_id}/rechazar",
+    response_model=TriageResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Auditoría Humana"],
+    summary="Rechazar un documento en cola de auditoría humana",
+)
+def rechazar_documento(documento_id: str, revision: RevisionHumanaRequest | None = None) -> TriageResponse:
+    """
+    Rechaza un documento que estaba pendiente de revisión. Permanece en
+    /auditoria_humana/ (el brief no define una carpeta /rechazados/), pero
+    queda marcado como "rechazado" con el comentario del revisor, para que
+    Frontend lo refleje y el caso no se confunda con uno aún pendiente.
+    """
+    doc = _obtener_doc_en_auditoria(documento_id)
+
+    doc.status = "rechazado"
+    if revision and revision.comentario:
+        doc.decision_enrutamiento.justificacion_enrutamiento += (
+            f" | Rechazado por revisor humano: {revision.comentario}"
+        )
+
+    try:
+        oci_service = get_oci_service()
+        contenido = {
+            "status": doc.status,
+            "documento_id": doc.documento_id,
+            "canal_origen": doc.canal_origen,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "clasificacion": doc.clasificacion.model_dump(),
+            "datos_extraidos": doc.datos_extraidos.model_dump(),
+            "decision_enrutamiento": doc.decision_enrutamiento.model_dump(),
+            "revision_humana": revision.model_dump() if revision else None,
+        }
+        ruta_objeto = oci_service.guardar_json(
+            documento_id=documento_id,
+            contenido=contenido,
+            estado=EstadoDocumento.AUDITORIA_HUMANA,
+        )
+        doc.almacenamiento_oci = AlmacenamientoOCI(
+            bucket=get_settings().OCI_BUCKET,
+            ruta_objeto=ruta_objeto,
+            status_backup="exito",
+        )
+    except Exception as exc:
+        logger.warning("No se pudo actualizar '%s' en OCI (%s).", documento_id, exc)
+        if doc.almacenamiento_oci:
+            doc.almacenamiento_oci.status_backup = "fallido"
+
+    _DOCUMENTOS_STORE[documento_id] = doc
+    return doc
