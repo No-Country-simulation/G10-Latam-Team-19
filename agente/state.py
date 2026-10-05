@@ -1,6 +1,6 @@
 from typing import Optional, TypedDict
 
-from schemas import Clasificacion, DatosExtraidos
+from schemas import Clasificacion, DatosExtraidos, DecisionEnrutamiento
 
 class AgentState(TypedDict, total=False):
     # ---- Input (desde el endpoint de Backend)
@@ -23,6 +23,18 @@ class AgentState(TypedDict, total=False):
     # ---- Completado en el nodo de score de confianza / urgencia
     final_confidence_score: Optional[float]
     requires_human_review: Optional[bool]
+
+    # ---- Completado en el Nodo 2 (priority.evaluate_priority)
+    nivel_prioridad: Optional[str]
+    destino_sugerido_nodo2: Optional[str]  # antes de aplicar la regla de score >= 0.90
+    disparar_alerta: Optional[bool]
+    forzar_auditoria: Optional[bool]
+    datos_faltantes_nodo2: Optional[list[str]]
+
+    # ---- Completado en el nodo de enrutamiento final
+    destino_final: Optional[str]
+    justificacion_enrutamiento: Optional[str]
+    decision_enrutamiento: Optional[DecisionEnrutamiento]  # listo para TriageResponse
 
     # ---- Manejo de errores (para no romper el grafo si un nodo falla)
     error: Optional[str]

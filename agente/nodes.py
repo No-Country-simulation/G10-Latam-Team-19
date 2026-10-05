@@ -1,5 +1,25 @@
 from state import AgentState
 
+
+def _message_content_to_text(content: object) -> str:
+    """Por si el LLM devuelve el contenido en bloques en lugar de string."""
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, list):
+        text_parts = []
+        for block in content:
+            if isinstance(block, str):
+                text_parts.append(block)
+            elif isinstance(block, dict) and isinstance(block.get("text"), str):
+                text_parts.append(block["text"])
+        text = "".join(text_parts)
+        if text:
+            return text
+
+    raise ValueError("La respuesta del LLM no contiene texto utilizable.")
+
+
 def classification_node(state: AgentState) -> dict:
     """
     Clasifica el documento: tipo_documento, especialidad, nivel_prioridad
@@ -17,8 +37,6 @@ def classification_node(state: AgentState) -> dict:
     para que el caso termine en revisión humana en vez de avanzar con datos falsos.
     """
     import json
-    import re
-
     from schemas import Clasificacion
     from llm_provider import get_llm
     from prompts import build_classification_prompt
@@ -38,7 +56,7 @@ def classification_node(state: AgentState) -> dict:
     # Capa 2: invoke plano + parseo manual
     try:
         response = llm.invoke(messages)
-        text = response.content.strip()
+        text = _message_content_to_text(response.content).strip()
         # Por si el modelo envuelve el JSON en un FencedCodeBlock de todas formas.
         text = text.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
         data = json.loads(text)
@@ -81,10 +99,7 @@ def extraction_node(state: AgentState) -> dict:
         try:
             response = llm.invoke(messages)
 
-            if not isinstance(response.content, str):
-                raise ValueError("La respuesta del LLM no es texto.")
-
-            text = response.content.strip()
+            text = _message_content_to_text(response.content).strip()
             text = (
                 text.removeprefix("```json")
                 .removeprefix("```")
@@ -127,15 +142,116 @@ def extraction_node(state: AgentState) -> dict:
 
 def confidence_node(state: AgentState) -> dict:
     """
-    Calcula el score de confianza final y si el caso requiere revisión humana.
-    Modo de cálculo a definir con el equipo de Datos.
-
-    TODO (Natalia): Este nodo NO se implementa hasta tener la matriz de decisión definitiva
-                    de datos (umbral de score, reglas de urgencia automática, mapeo score+prioridad -> destino).
+    Nodo 1 (filtro de confianza): el score que decide el gate NO es el que
+    "inventa" el LLM en Clasificación, es el score determinístico que ya
+    calculó Extracción (extraction_confidence_score), restando los pesos
+    de Datos según qué campos faltan. Acá solo se promueve a
+    final_confidence_score, que es el que usa la arista condicional.
     """
-    classification = state.get("classification")
-    extracted_data = state.get("extracted_data")
+    score = state["extraction_confidence_score"]
+    return {
+        "final_confidence_score": score,
+        # Banda Media (0.75-0.89) ya requiere auditoría por score; en banda
+        # Alta esto puede pisarse después en el nodo final si el Nodo 2
+        # detecta un medicamento restringido.
+        "requires_human_review": score < 0.90,
+    }
 
-    raise NotImplementedError(
-        "TODO (Ilana): pendiente de la matriz de decisión del equipo de Datos."
+
+def corte_revision_humana_node(state: AgentState) -> dict:
+    """
+    Se activa solo cuando final_confidence_score < 0.75 (banda Baja).
+    Corta el flujo automático: no se evalúa el Nodo 2, va directo a
+    revisión humana.
+    """
+    score = state["final_confidence_score"]
+    return {
+        "requires_human_review": True,
+        "destino_final": "Cola_Revision_Humana",
+        "justificacion_enrutamiento": (
+            f"Score de confianza bajo ({score:.2f} < 0.75): datos críticos "
+            "faltantes, se detiene el procesamiento automático antes del Nodo 2."
+        ),
+    }
+
+
+def priority_node(state: AgentState) -> dict:
+    """
+    Nodo 2 (Natalia): envuelve priority.evaluate_priority. Trabaja sobre
+    datos_extraidos ya estructurado, no sobre documento_texto crudo, para
+    evitar falsos positivos por negaciones (ej. "se descarta TEP").
+
+    Nota: evaluate_priority no recibe el score ni lo necesita, según
+    priority_config.json ("_decisiones_provisorias"). La regla de que
+    Farmacia exige score >= 0.90 queda a cargo del nodo final, no de este.
+    """
+    from priority import evaluate_priority, load_config
+
+    extracted_data = state["extracted_data"]
+    config = load_config()
+    result = evaluate_priority(extracted_data.model_dump(), config)
+
+    return {
+        "nivel_prioridad": result["nivel_prioridad"],
+        "destino_sugerido_nodo2": result["destino_principal"],
+        "disparar_alerta": result["disparar_alerta"],
+        "forzar_auditoria": result["forzar_auditoria"],
+        "datos_faltantes_nodo2": result["datos_faltantes"],
+    }
+
+
+def enrutamiento_final_node(state: AgentState) -> dict:
+    """
+    Arma la decisión definitiva combinando:
+    - final_confidence_score (banda de confianza)
+    - destino_sugerido_nodo2 (ya resuelve Urgente/Auditoría/Farmacia/Historia,
+      pero asumiendo score alto)
+    - forzar_auditoria (medicamento restringido -> puede pisar aunque el
+      score sea perfecto)
+    """
+    from schemas import (
+        DecisionEnrutamiento,
+        DestinoEnrutamiento,
+        NotificacionGenerada,
     )
+
+    score = state["final_confidence_score"]
+    destino_sugerido = state["destino_sugerido_nodo2"]
+    forzar_auditoria = state.get("forzar_auditoria", False)
+    disparar_alerta = state.get("disparar_alerta", False)
+    nivel_prioridad = state["nivel_prioridad"]
+
+    # Regla documentada por Natalia: Farmacia exige score Alto (>= 0.90).
+    if destino_sugerido == DestinoEnrutamiento.FARMACIA_HOSPITALARIA.value and score < 0.90:
+        destino_final = DestinoEnrutamiento.AUDITORIA_AUTORIZACIONES.value
+    else:
+        destino_final = destino_sugerido
+
+    requiere_auditoria_final = (score < 0.90) or forzar_auditoria
+
+    notificacion = None
+    if disparar_alerta:
+        notificacion = NotificacionGenerada(
+            canal="Alerta_Guardia_Medica",
+            mensaje=f"ALERTA: caso {nivel_prioridad} detectado, score {score:.2f}.",
+        )
+
+    justificacion = f"Score {score:.2f}, prioridad {nivel_prioridad}"
+    if forzar_auditoria:
+        justificacion += ", medicamento restringido detectado"
+    if destino_final != destino_sugerido:
+        justificacion += f" (Nodo 2 sugirió {destino_sugerido}, redirigido por score < 0.90 a Farmacia)"
+
+    decision = DecisionEnrutamiento(
+        destino_principal=DestinoEnrutamiento(destino_final),
+        requiere_auditoria_humana=requiere_auditoria_final,
+        justificacion_enrutamiento=justificacion,
+        notificacion_generada=notificacion,
+    )
+
+    return {
+        "destino_final": destino_final,
+        "requires_human_review": requiere_auditoria_final,
+        "justificacion_enrutamiento": justificacion,
+        "decision_enrutamiento": decision,
+    }
