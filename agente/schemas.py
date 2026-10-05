@@ -81,7 +81,7 @@ class DocumentoClinicoRequest(BaseModel):
 
 class Clasificacion(BaseModel):
     tipo_documento: TipoDocumento
-    especialidad: str = Field(..., examples=["Radiología / Neumonología"])
+    especialidad: str
     nivel_prioridad: NivelPrioridad
     score_confianza_clasificacion: float = Field(..., ge=0.0, le=1.0)
 
