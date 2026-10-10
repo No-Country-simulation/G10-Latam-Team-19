@@ -26,6 +26,8 @@ class AgentState(TypedDict, total=False):
 
     # ---- Completado en el Nodo 2 (priority.evaluate_priority)
     nivel_prioridad: Optional[str]
+    nivel_prioridad_apoyo: Optional[str]
+    justificacion_apoyo: Optional[str]
     destino_sugerido_nodo2: Optional[str]  # antes de aplicar la regla de score >= 0.90
     disparar_alerta: Optional[bool]
     forzar_auditoria: Optional[bool]

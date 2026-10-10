@@ -149,7 +149,9 @@ def evaluate_vitals(
     }
 
 
-def evaluate_priority(extracted_data: dict, config: dict) -> dict:
+def evaluate_priority(extracted_data: dict, config: dict, clinical_level: str | None = None) -> dict:
+    if clinical_level is not None and clinical_level not in config["orden_gravedad"]:
+        raise ValueError("Nivel clínico de apoyo inválido")
     patient = extracted_data.get("paciente") or {}
     medication_names = [
         m["nombre"] for m in extracted_data.get("medicamentos") or [] if m.get("nombre")
@@ -165,6 +167,8 @@ def evaluate_priority(extracted_data: dict, config: dict) -> dict:
     medications = evaluate_medications(medication_names, config)
 
     levels = [result["level"] for result in (keywords, vitals) if result["level"]]
+    if clinical_level is not None:
+        levels.append(clinical_level)
     # Sin ninguna señal el caso queda en la banda más leve; los faltantes quedan registrados.
     level = most_severe(levels, config) or config["orden_gravedad"][0]
 

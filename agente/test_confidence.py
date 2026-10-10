@@ -15,7 +15,7 @@ def complete_data(**patient):
         medico_solicitante={"nombre": "Dra. Prueba"},
         diagnostico_principal="Diagnóstico ficticio",
         estudio_realizado="Estudio ficticio",
-        medicamentos=[{"nombre": "Medicamento ficticio", "dosis": "10 mg", "frecuencia_diaria": "una vez al día"}],
+        medicamentos=[{"nombre": "Medicamento ficticio", "via": "Oral", "dosis": "10 mg", "frecuencia_diaria": "una vez al día"}],
     )
 
 
@@ -107,10 +107,53 @@ class ConfidenceTests(unittest.TestCase):
 
     def test_partial_medication_list_is_not_hidden_by_complete_entry(self):
         data = DatosExtraidos.model_validate({**complete_data().model_dump(), "medicamentos": [
-            {"nombre": "A", "dosis": "10 mg", "frecuencia_diaria": "diaria"},
-            {"nombre": "B", "dosis": "No consignado", "frecuencia_diaria": "diaria"},
+            {"nombre": "A", "via": "Oral", "dosis": "10 mg", "frecuencia_diaria": "diaria"},
+            {"nombre": "B", "via": "Oral", "dosis": "No consignado", "frecuencia_diaria": "diaria"},
         ]})
         self.assertEqual(confidence_score(data, TipoDocumento.RECETA_MEDICA), .70)
+
+    def test_missing_name_dose_or_route_share_one_penalty(self):
+        from itertools import combinations
+        for count in range(1, 4):
+            for fields in combinations(("nombre", "dosis", "via"), count):
+                with self.subTest(fields=fields):
+                    data = complete_data()
+                    for field in fields:
+                        setattr(data.medicamentos[0], field, "" if field == "nombre" else None)
+                    self.assertEqual(confidence_score(data, TipoDocumento.RECETA_MEDICA), 0.70)
+                    self.assertEqual(missing_relevant_fields(data, TipoDocumento.RECETA_MEDICA), ["medicamentos_o_dosis"])
+                    self.assertEqual(confidence_score(data, TipoDocumento.EPICRISIS), 1.0)
+
+    def test_incomplete_routes_across_medications_discount_once(self):
+        data = complete_data()
+        data.medicamentos = DatosExtraidos.model_validate({
+            "paciente": {"edad": 35},
+            "medicamentos": [
+                {"nombre": "A", "via": "Oral", "dosis": "10 mg", "frecuencia_diaria": "diaria"},
+                {"nombre": "B", "dosis": "20 mg", "frecuencia_diaria": "diaria"},
+                {"nombre": "C", "via": None, "dosis": None, "frecuencia_diaria": "diaria"},
+            ],
+        }).medicamentos
+        self.assertEqual(confidence_score(data, TipoDocumento.RECETA_MEDICA), 0.70)
+        self.assertEqual(missing_relevant_fields(data, TipoDocumento.RECETA_MEDICA), ["medicamentos_o_dosis"])
+        data.medicamentos[1].frecuencia_diaria = None
+        self.assertEqual(confidence_score(data, TipoDocumento.RECETA_MEDICA), 0.65)
+
+    def test_missing_route_penalty_in_both_extraction_routes(self):
+        for fallback in (False, True):
+            with self.subTest(fallback=fallback):
+                data = complete_data()
+                data.medicamentos[0].via = None
+                llm = Mock()
+                llm.with_structured_output.return_value.invoke.return_value = data.model_dump()
+                if fallback:
+                    llm.with_structured_output.side_effect = RuntimeError("unsupported")
+                    llm.invoke.return_value.content = data.model_dump_json()
+                with patch("llm_provider.get_llm", return_value=llm):
+                    result = extraction_node({"document_text": "Documento ficticio", "classification": classification()})
+                self.assertEqual(result["extraction_confidence_score"], 0.70)
+                self.assertEqual(result["missing_relevant_fields"], ["medicamentos_o_dosis"])
+                self.assertIsNone(result["extracted_data"].medicamentos[0].via)
 
     def test_vital_sign_completeness(self):
         from schemas import SignosVitales

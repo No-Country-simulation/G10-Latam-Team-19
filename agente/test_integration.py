@@ -4,8 +4,8 @@
 # al 100% porque depende de lo que devuelva el proveedor) y consume llamadas.
 #
 # Uso:
-#   python test_integration_real.py            -> corre los 5 casos
-#   python test_integration_real.py caso_2      -> corre solo uno
+#   python test_integration.py            -> corre los 5 casos
+#   python test_integration.py caso_2      -> corre solo uno
 
 import argparse
 import sys
@@ -61,9 +61,8 @@ CASOS = {
             "50 mcg/h, aplicación tópica continua, recambio cada 72 horas."
         ),
         "esperado": {
-            # Conocido: priority.py no detecta "dolor severo activo" como
-            # Prioritario (ver _pendiente_michelle en priority_config.json).
-            # Lo que SÍ debe cumplirse siempre es el desvío por medicamento.
+            # El apoyo clínico debe reconocer la exacerbación activa.
+            "nivel_prioridad": "Prioritario",
             "destino_final": "Auditoria_Autorizaciones",
             "requires_human_review": True,
         },
@@ -110,14 +109,33 @@ def run_case(nombre: str, caso: dict, graph) -> bool:
     print(f"{nombre}: {caso['descripcion']}")
     print("=" * 70)
 
-    result = graph.invoke({
-        "document_id": f"TEST-{nombre}",
-        "document_text": caso["texto"],
-        "origin_channel": "Test_Integracion",
-    })
+    try:
+        result = graph.invoke({
+            "document_id": f"TEST-{nombre}",
+            "document_text": caso["texto"],
+            "origin_channel": "Test_Integracion",
+        })
+    except Exception as error:
+        cause = error.__cause__ or error
+        print(f"ERROR: {type(error).__name__}; causa: {type(cause).__name__}")
+        if type(cause).__name__ == "RateLimitError":
+            import re
+            body = getattr(cause, "body", {})
+            if isinstance(body, dict):
+                detail = body.get("error", body)
+                message = detail.get("message", "") if isinstance(detail, dict) else ""
+                message = re.sub(r"organization `[^`]+`", "organization [oculta]", message)
+                print("Límite del proveedor:", message[:700])
+        return False
 
+
+    print("Clasificación:    ", result["classification"].tipo_documento.value)
+    print("Campos ausentes:  ", result.get("missing_relevant_fields"))
+    print("Datos extraídos:  ", result["extracted_data"].model_dump_json())
     print("Score final:      ", result.get("final_confidence_score"))
     print("Nivel prioridad:  ", result.get("nivel_prioridad"))
+    print("Prioridad apoyo:  ", result.get("nivel_prioridad_apoyo"))
+    print("Motivo apoyo:     ", result.get("justificacion_apoyo"))
     print("Destino final:    ", result.get("destino_final"))
     print("Auditoría humana: ", result.get("requires_human_review"))
     print("Justificación:    ", result.get("justificacion_enrutamiento"))

@@ -49,10 +49,12 @@ def missing_relevant_fields(
     if document_type == TipoDocumento.RECETA_MEDICA:
         medications = data.medicamentos or []
         # Una penalización por categoría, no por medicamento o subcampo.
-        # La vía no existe en el contrato actual y no se inventa.
+        # Nombre, dosis y vía comparten el descuento 0.30 del PDF.
+        # Se conserva la etiqueta pública medicamentos_o_dosis por compatibilidad.
         fields["medicamentos_o_dosis"] = (
             None if not medications or any(
-                is_missing(m.nombre) or is_missing(m.dosis) for m in medications
+                is_missing(m.nombre) or is_missing(m.dosis) or is_missing(m.via)
+                for m in medications
             ) else True
         )
         fields["frecuencia_diaria"] = (

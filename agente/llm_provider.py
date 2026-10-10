@@ -29,6 +29,9 @@ def get_llm():
 
             return ChatGroq(
                 model=os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b"),
+                max_tokens=int(os.getenv("GROQ_MAX_TOKENS", "800")),
+                timeout=30,
+                max_retries=0,
                 api_key=api_key,
                 temperature=0,
             )

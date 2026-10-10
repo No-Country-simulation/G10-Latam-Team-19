@@ -10,7 +10,7 @@
     "Citostaticos/Quimioterapia: el PDF no da nombres de farmacos, solo la familia"
   ],
   "_pendiente_equipo": [
-    "Caso 3 (fentanilo): ninguna regla detecta el 'dolor severo activo' y la funcion da Rutina; requiere el LLM de apoyo propuesto por Jairo, combinado con 'gana el mas grave'",
+    "Caso 3: la funcion deterministica sola da Rutina; el apoyo LLM ya implementado detecta exacerbacion activa como Prioritario. Ampliar validacion de estabilidad.",
     "Parte del score final y requires_human_review de confidence_node: sin responsable definido"
   ],
   "_limitaciones_conocidas": [
