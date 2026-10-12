@@ -25,6 +25,11 @@ class Settings:
     COHERE_API_KEY: str | None = os.getenv("COHERE_API_KEY")
     GEMINI_API_KEY: str | None = os.getenv("GEMINI_API_KEY")
 
+    # --- Agente (grafo LangGraph) ---
+    # Carpeta donde se alojan graph.py / nodes.py / schemas.py del agente. Si no se define,
+    # se busca ../agente y ../agentes respecto a la raíz del backend.
+    AGENTE_DIR: str | None = os.getenv("AGENTE_DIR")
+
     # --- OCI Object Storage (Always Free) ---
     OCI_NAMESPACE: str | None = os.getenv("OCI_NAMESPACE")
     OCI_BUCKET: str = os.getenv("OCI_BUCKET", "mediflow-documentos-clinicos")

@@ -21,6 +21,14 @@ Backend para el pipeline autónomo de triaje, extracción y enrutamiento intelig
 
 ---
 
+## 🤖 Agente real (LangGraph)
+
+`POST /triage` ejecuta el grafo real de la carpeta del agente (`app/services/agente.py`): agrega esa carpeta a `sys.path`, importa `graph.build_graph` y traduce la salida a los schemas del backend. El bucket (`/procesados/` vs `/auditoria_humana/`) sale de `decision_enrutamiento.requiere_auditoria_humana` que decide el grafo; `/validados/` solo se alcanza al aprobar.
+
+- La carpeta se busca en `AGENTE_DIR` (`.env`), o en `../agente` y `../agentes`.
+- El agente lee **su propio** `.env` (`agente/.env`: `LLM_ENV`, `LLM_DEV_PROVIDER`, `GROQ_API_KEY`/`COHERE_API_KEY`/`GEMINI_API_KEY`).
+- Contrato de auditoría para Frontend: ver `CONTRATO_AUDITORIA.md`.
+
 ## 📋 Requisitos Previos
 
 - **Python:** 3.10 o superior (recomendado 3.11 o 3.12).
@@ -137,14 +145,14 @@ El backend estará disponible en:
     "revisor": "Dra. Michelle Sutachan"
   }
   ```
-- **Respuesta:** `TriageResponse` actualizado (`status="validado"`, `requiere_auditoria_humana=false`).
-- **Errores:** `404` si el documento no existe; `400` si el documento no estaba en cola de auditoría.
+- **Respuesta:** `TriageResponse` actualizado (`status="validados"`, `decision_auditoria="aprobado"`, `requiere_auditoria_humana=false`).
+- **Errores:** `404` si el documento no existe; `409` si no estaba en cola de auditoría; `502` si OCI falla (el caso sigue pendiente).
 - Mueve el objeto de `/auditoria_humana/` a `/validados/` en OCI Object Storage.
 
 ### 5. `POST /triage/{documento_id}/rechazar` (Rechazar en cola de auditoría)
 - **Cuerpo (Request, opcional):** mismo formato que `/aprobar`.
-- **Respuesta:** `TriageResponse` actualizado (`status="rechazado"`).
-- **Errores:** `404` si el documento no existe; `400` si el documento no estaba en cola de auditoría.
+- **Respuesta:** `TriageResponse` actualizado (`status="auditoria_humana"`, `decision_auditoria="rechazado"`).
+- **Errores:** igual que `/aprobar`.
 - El documento permanece en `/auditoria_humana/` (el brief no define una carpeta `/rechazados/` separada).
 
 ---

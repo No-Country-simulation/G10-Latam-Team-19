@@ -3,3 +3,10 @@ uvicorn[standard]>=0.32
 pydantic>=2.9
 python-dotenv>=1.0
 oci>=2.135
+
+# Dependencias del agente (el backend importa su grafo)
+langgraph
+langchain-core
+langchain-groq
+langchain-cohere
+langchain-google-genai
