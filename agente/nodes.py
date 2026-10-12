@@ -176,23 +176,22 @@ def corte_revision_humana_node(state: AgentState) -> dict:
 
 
 def priority_node(state: AgentState) -> dict:
-    """
-    Nodo 2 (Natalia): envuelve priority.evaluate_priority. Trabaja sobre
-    datos_extraidos ya estructurado, no sobre documento_texto crudo, para
-    evitar falsos positivos por negaciones (ej. "se descarta TEP").
-
-    Nota: evaluate_priority no recibe el score ni lo necesita, según
-    priority_config.json ("_decisiones_provisorias"). La regla de que
-    Farmacia exige score >= 0.90 queda a cargo del nodo final, no de este.
-    """
+    """Combina reglas y apoyo LLM con la máxima gravedad; calcula el destino después."""
     from priority import evaluate_priority, load_config
+    from priority_support import evaluate_clinical_support
 
     extracted_data = state["extracted_data"]
     config = load_config()
-    result = evaluate_priority(extracted_data.model_dump(), config)
+    support = evaluate_clinical_support(
+        extracted_data.diagnostico_principal, extracted_data.estudio_realizado,
+    )
+    support_level = support.nivel_prioridad.value if support.nivel_prioridad else None
+    result = evaluate_priority(extracted_data.model_dump(), config, clinical_level=support_level)
 
     return {
         "nivel_prioridad": result["nivel_prioridad"],
+        "nivel_prioridad_apoyo": support_level,
+        "justificacion_apoyo": support.justificacion,
         "destino_sugerido_nodo2": result["destino_principal"],
         "disparar_alerta": result["disparar_alerta"],
         "forzar_auditoria": result["forzar_auditoria"],

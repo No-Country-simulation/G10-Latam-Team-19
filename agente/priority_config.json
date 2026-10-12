@@ -1,7 +1,6 @@
 {
   "_fuente": "Proyecto alura_Data_UmbralScoreyReglas (1).pdf, pp. 9-17 (Nodo 2, criterios de separacion, casos de prueba)",
   "_pendiente_michelle": [
-    "Caso 5 (11 meses, 38.9 C): la regla de lactantes (> 38.0 Urgente) contradice el Prioritario esperado",
     "Rutina con medicamentos comunes (ej. renovacion de receta): la matriz dice Historia Clinica, el diagrama dice Farmacia",
     "Huecos adultos sin banda: FC 100-110, temperatura 35-36 y 37.5-38.5, SpO2 94-95",
     "Huecos pediatria meses/dias: FC 80-100; solapamiento FR 40",
@@ -10,7 +9,7 @@
     "Citostaticos/Quimioterapia: el PDF no da nombres de farmacos, solo la familia"
   ],
   "_pendiente_equipo": [
-    "Caso 3 (fentanilo): ninguna regla detecta el 'dolor severo activo' y la funcion da Rutina; requiere el LLM de apoyo propuesto por Jairo, combinado con 'gana el mas grave'",
+    "Caso 3: la funcion deterministica sola da Rutina; el apoyo LLM ya implementado detecta exacerbacion activa como Prioritario. Ampliar validacion de estabilidad.",
     "Parte del score final y requires_human_review de confidence_node: sin responsable definido"
   ],
   "_limitaciones_conocidas": [

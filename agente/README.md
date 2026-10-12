@@ -2,13 +2,15 @@
 
 Base del grafo de decisión del agente de triaje clínico.
 
-Estado actual: **flujo lineal**, sin ramas condicionales todavía.
+Estado actual: **grafo con filtro de confianza, prioridad y enrutamiento implementados**.
 
 ```text
-clasificación -> extracción -> score_confianza -> FIN
+clasificación -> extracción -> score_confianza
+  score < 0.75 -> revisión humana -> FIN
+  score >= 0.75 -> prioridad -> enrutamiento final -> FIN
 ```
 
-Clasificación y extracción están implementadas con respuesta estructurada y fallback JSON validado por Pydantic. La extracción informa datos ausentes y un score provisional de completitud. El nodo de confianza final, la revisión humana y el enrutamiento siguen pendientes de sus responsables y de la matriz del equipo de Datos.
+Clasificación y extracción están implementadas con respuesta estructurada y fallback JSON validado por Pydantic. La extracción informa datos ausentes y un score determinístico de completitud. El nodo de confianza lo utiliza para el filtro; las reglas de prioridad y el enrutamiento están implementados. Persisten interpretaciones pendientes de confirmación con Datos.
 
 ## Idioma
 
@@ -32,7 +34,7 @@ Esto es solo interno: el **contrato de salida** hacia el resto del sistema sigue
 | ----------------------------- | ------------ | ----------- |
 | Clasificación                 | Implementado | Jairo       |
 | Extracción                    | Implementado | Seylin      |
-| Score de confianza / urgencia | Pendiente    | Natalia     |
+| Score de confianza / urgencia | Implementado | Natalia     |
 
 ### Clasificación
 
@@ -43,7 +45,7 @@ Esto es solo interno: el **contrato de salida** hacia el resto del sistema sigue
 
 Si ambas estrategias fallan, el nodo **no genera una clasificación por defecto**. En su lugar, lanza un error explícito para evitar que el flujo continúe con datos potencialmente falsos.
 
-La derivación efectiva de estos casos a revisión humana se implementará junto con las ramas condicionales del grafo.
+Las excepciones del proveedor todavía se propagan: el corte de revisión humana actual cubre score bajo, no fallos de clasificación o extracción.
 
 El prompt de clasificación obtiene los valores permitidos directamente de los enums definidos en `schemas.py`, evitando duplicar manualmente las categorías y niveles de prioridad.
 
@@ -84,17 +86,15 @@ cp .env.example .env
 python main.py
 ```
 
-**Nota:** `main.py` todavía no puede completar el flujo entero porque `confidence_node` conserva su `NotImplementedError` original. La extracción puede probarse de forma aislada; las llamadas reales requieren un proveedor LLM configurado.
+**Nota:** las ejecuciones reales requieren un proveedor LLM configurado y consumen llamadas.
 
-## Próxima iteración esperada
+## Pendientes de validación
 
-Agregar las ramas condicionales para los distintos destinos del flujo, incluyendo los casos que requieran **revisión humana**, una vez definidos:
-
-1. Los prompts y validaciones definitivos de los tres nodos.
-2. Los umbrales de confianza.
-3. Las reglas de prioridad y urgencia.
-4. El mapeo entre clasificación, score y destino.
-5. Las condiciones que obligan a derivar un documento a revisión humana.
+- Evaluar el prompt con documentos ficticios y proveedor real; las pruebas locales simulan sus respuestas.
+- Confirmar con Datos las interpretaciones de PESOS_PENDIENTES.md.
+- Resolver los dos fallos esperados de prioridad (dolor severo y caso pediátrico) conforme a reglas acordadas.
+- Implementar el manejo de errores del proveedor para revisión humana.
+- Confirmar el objetivo semanal exacto antes de declarar su cumplimiento.
 
 ## Regla de confianza por datos faltantes
 
@@ -107,7 +107,7 @@ El score de extracción mide completitud, no exactitud clínica. Se calcula desd
 | --- | --- | --- |
 | Edad numérica | 0.15 | Siempre, conservando la regla acordada; cero es válido |
 | Diagnóstico o CIE-10 | 0.15 | Si faltan ambos |
-| Medicamento o dosis | 0.30 | En receta, si falta cualquiera en alguna entrada |
+| Medicamento, dosis o vía | 0.30 | En receta, si falta cualquiera en alguna entrada |
 | Frecuencia diaria | 0.05 | En receta, si falta en alguna entrada o no hay medicamentos |
 | Signos vitales incompletos | 0.10 | Si existe el objeto y falta alguno de sus cinco campos |
 | Sexo | 0.05 | Descuento base por ausencia; no se infiere dependencia clínica |
@@ -116,11 +116,11 @@ El score de extracción mide completitud, no exactitud clínica. Se calcula desd
 Todas las categorías aplicadas aparecen en `missing_relevant_fields`; las etiquetas de
 medicamentos/dosis y diagnóstico cambiaron para reflejar penalizaciones agrupadas.
 No se penaliza médico ni estudio, porque no figuran en la tabla del PDF.
-No se añade vía al schema. Las decisiones temporales y preguntas para Datos
+La vía se extrae mediante ViaAdministracion y su ausencia activa el descuento agrupado de 0.30 en recetas, sin sumarlo por cada campo o fármaco. La etiqueta medicamentos_o_dosis se conserva por compatibilidad y ahora también incluye vía. Las decisiones temporales y preguntas para Datos
 están en [PESOS_PENDIENTES.md](PESOS_PENDIENTES.md).
 
 La extracción conserva `extraction_confidence_score`; no modifica el score
-LLM de clasificación ni implementa el filtro, la prioridad o el enrutamiento.
+LLM de clasificación. El filtro utiliza ese score de extracción mediante final_confidence_score.
 Los pesos están alineados al PDF, pero su aplicación clínica completa requiere
 resolver los pendientes documentados.
 
@@ -130,3 +130,29 @@ Pruebas locales sin llamadas al proveedor, desde la raíz:
 .\.venv\Scripts\python.exe -m unittest discover -s agente -p 'test_*.py' -v
 .\.venv\Scripts\python.exe -m compileall -q agente schemas.py
 ```
+
+Las pruebas de test_graph_local.py recorren el grafo con proveedor simulado: corte por score bajo, límite 0.75, conservación de vía y auditoría por medicamento restringido.
+
+Evaluación real de extracción: `python evaluate_extraction.py --output informe.json`.
+Groq usa GROQ_MAX_TOKENS (800 por defecto), timeout de 30 segundos y sin reintentos automáticos.
+El límite por minuto de la cuenta puede requerir espaciar las ejecuciones; un error 429 no mide precisión del prompt.
+
+## Apoyo LLM del Nodo 2
+
+priority_support.py evalúa únicamente diagnostico_principal y estudio_realizado.
+Valida ApoyoPrioridad mediante respuesta estructurada; si falla, intenta JSON manual.
+Si ambas rutas fallan, lanza RuntimeError sin inventar una prioridad. Si no existe
+ninguno de los dos textos, omite la llamada y conserva la evaluación determinística.
+La gravedad máxima entre reglas existentes y apoyo determina la prioridad; el destino
+se calcula después, conservando medicamentos restringidos y el filtro de confianza.
+El estado conserva nivel_prioridad_apoyo y justificacion_apoyo para inspección.
+
+El apoyo no resuelve contradicciones entre el PDF y los casos esperados. Tampoco
+puede rebajar un falso positivo de palabras clave determinísticas en diagnósticos negados.
+Los errores del apoyo se propagan; su derivación automática a revisión humana sigue pendiente.
+
+El apoyo limita su respuesta a 256 tokens y respeta una configuración menor del proveedor; clasificación y extracción conservan sus propios límites.
+
+Validación adicional aislada del Nodo 2: `python evaluate_priority_cases.py --output informe_nodo2.json --repetitions 2 --interval 20`. Usa casos ficticios, consume llamadas al proveedor y compara apoyo y resultado combinado por separado. No ejecuta el grafo completo.
+
+Validación contextual por grafo completo: `python evaluate_pipeline_context.py --output contexto.json --interval 65`. Para retomar solo controles pendientes, añadir `--case antecedente_y_infarto_actual infarto_descartado_signo_critico`. Las cuotas diarias no se resuelven solo espaciando solicitudes.

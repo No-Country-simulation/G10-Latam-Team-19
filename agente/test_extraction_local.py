@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from nodes import extraction_node
-from schemas import DatosExtraidos
+from schemas import DatosExtraidos, ViaAdministracion
 
 
 class ExtractionTests(unittest.TestCase):
@@ -15,8 +15,8 @@ class ExtractionTests(unittest.TestCase):
                     data = DatosExtraidos(
                         paciente={"nombre": "Ana", "edad": 0, "unidad_edad": unit,
                                   "sexo": "F", "documento_identidad": "ABC123456"},
-                        medicamentos=[{"nombre": "A", "dosis": "10 mg", "frecuencia_diaria": "una vez al día"},
-                                      {"nombre": "B", "dosis": None}],
+                        medicamentos=[{"nombre": "A", "via": "Oral", "dosis": "10 mg", "frecuencia_diaria": "una vez al día"},
+                                      {"nombre": "B", "via": None, "dosis": None}],
                         signos_vitales={"temperatura": 37.5, "frecuencia_cardiaca": 110,
                                         "frecuencia_respiratoria": 24, "presion_arterial": "120/80",
                                         "saturacion_oxigeno": 95},
@@ -33,10 +33,36 @@ class ExtractionTests(unittest.TestCase):
                     self.assertEqual(result["missing_critical_fields"], [])
                     self.assertEqual(llm.max_tokens, 2048)
 
+    def test_via_preserved_in_both_routes(self):
+        import json
+        for via in [None, *(route.value for route in ViaAdministracion)]:
+            for fallback in (False, True):
+                with self.subTest(via=via, fallback=fallback):
+                    medication = {"nombre": "A", "dosis": "10 mg"}
+                    if via is not None:
+                        medication["via"] = via
+                    payload = {"paciente": {"edad": 42}, "medicamentos": [medication]}
+                    llm = Mock()
+                    llm.with_structured_output.return_value.invoke.return_value = payload
+                    if fallback:
+                        llm.with_structured_output.side_effect = RuntimeError("unsupported")
+                        llm.invoke.return_value.content = json.dumps(payload)
+                    with patch("llm_provider.get_llm", return_value=llm):
+                        result = extraction_node({"document_text": "Documento ficticio"})
+                    actual = result["extracted_data"].model_dump(mode="json")["medicamentos"][0]
+                    self.assertEqual(actual["via"], via)
+                    self.assertEqual(list(actual), ["nombre", "via", "dosis", "frecuencia_diaria"])
+                    if fallback:
+                        llm.invoke.assert_called_once()
+                    else:
+                        llm.invoke.assert_not_called()
+
     def test_invalid_new_fields_fail_both_routes(self):
         import json
         invalid_cases = [
             {"medicamentos": ["A"]},
+            {"medicamentos": [{"nombre": "A", "via": "inventada"}]},
+            {"medicamentos": [{"nombre": "A", "via": ["Oral"]}]},
             {"medicamentos": [{"nombre": "A", "dosis": ["10 mg"]}]},
             {"signos_vitales": {"saturacion_oxigeno": 101}},
             {"signos_vitales": {"presion_arterial": "incorrecta"}},
@@ -68,7 +94,18 @@ class ExtractionTests(unittest.TestCase):
 
         self.assertIsInstance(result["extracted_data"], DatosExtraidos)
         self.assertEqual(result["missing_critical_fields"], [])
-        self.assertEqual(result["extraction_confidence_score"], 1.0)
+
+        # El nombre ausente no genera penalización.
+        self.assertEqual(result["missing_critical_fields"], [])
+
+        # Los descuentos corresponden al diagnóstico y al sexo.
+        self.assertEqual(
+            result["missing_relevant_fields"],
+            ["diagnostico_o_cie10", "paciente.sexo"]
+        )
+
+        # 1.0 - 0.15 - 0.05 = 0.80
+        self.assertEqual(result["extraction_confidence_score"], 0.8)
 
     def test_nombre_presente_con_fallback(self):
         llm = Mock()
@@ -93,7 +130,9 @@ class ExtractionTests(unittest.TestCase):
     def test_respuesta_invalida_genera_error(self):
         llm = Mock()
         llm.with_structured_output.return_value.invoke.return_value = {}
-        llm.invoke.return_value.content = '{"paciente": {"edad": 42}}'
+
+        # El fallback también debe devolver datos inválidos.
+        llm.invoke.return_value.content = '{"paciente": {"edad": -1}}'
 
         with patch("llm_provider.get_llm", return_value=llm):
             with self.assertRaises(RuntimeError):

@@ -438,14 +438,14 @@ class MichelleTestCases(unittest.TestCase):
         # Requiere el LLM de apoyo (Jairo): ninguna regla detecta el 'dolor severo activo'.
         self.assertEqual(self.case_3()["nivel_prioridad"], "Prioritario")
 
-    @unittest.expectedFailure
-    def test_case_5_infant_expected_priority(self):
-        # Pendiente Michelle: la regla de lactantes (> 38.0 °C) da Urgente, el caso espera Prioritario.
+    def test_case_5_infant_fever_is_urgent(self):
+        # Michelle confirmó la regla de lactantes (> 38.0 °C = Urgente); se corrigió el resultado esperado.
         vitals = {"frecuencia_cardiaca": 150, "frecuencia_respiratoria": 42,
                   "saturacion_oxigeno": 97, "temperatura": 38.9}
         result = self.evaluate(11, "meses", "Infección viral no especificada", vitals, ["Paracetamol gotas"])
-        self.assertEqual(result["nivel_prioridad"], "Prioritario")
-        self.assertEqual(result["destino_principal"], "Farmacia_Hospitalaria")
+        self.assertEqual(result["nivel_prioridad"], "Urgente")
+        self.assertEqual(result["destino_principal"], "Cola_Emergencia_Medica")
+        self.assertTrue(result["disparar_alerta"])
 
 
 if __name__ == "__main__":

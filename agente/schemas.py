@@ -86,8 +86,15 @@ class Clasificacion(BaseModel):
     score_confianza_clasificacion: float = Field(..., ge=0.0, le=1.0)
 
 
+class ApoyoPrioridad(BaseModel):
+    nivel_prioridad: Optional[NivelPrioridad] = Field(
+        ..., description="Prioridad sustentada en diagnóstico/estudio; null si no hay evidencia suficiente."
+    )
+    justificacion: str = Field(..., min_length=1)
+
+
 class Paciente(BaseModel):
-    nombre: Optional[str] = None,
+    nombre: Optional[str] = None
     edad: Optional[int] = Field(None, ge=0, le=130)
     unidad_edad: Optional[UnidadEdad] = Field(
         default=UnidadEdad.ANOS, 
@@ -106,15 +113,6 @@ class MedicoSolicitante(BaseModel):
     matricula: Optional[str] = None
 
 
-class MedicamentoPrescrito(BaseModel):
-    nombre: str
-    dosis: Optional[str] = None
-    frecuencia_diaria: Optional[str] = None
-    via: Optional[ViaAdministracion] = Field(
-        None, 
-        description="Vía de administración normalizada. Si el texto dice 'por boca', mapear a 'Oral'."
-    )
-
 class ViaAdministracion(str, Enum):
     ORAL = "Oral"
     SUBLINGUAL = "Sublingual"
@@ -129,6 +127,16 @@ class ViaAdministracion(str, Enum):
     VAGINAL = "Vaginal"
     ENTERAL = "Sonda Enteral"
     OTRA = "Otra_No_Especificada"
+
+
+class MedicamentoPrescrito(BaseModel):
+    nombre: str
+    via: Optional[ViaAdministracion] = Field(
+        None,
+        description="Vía de administración normalizada. Si el texto dice 'por boca', mapear a 'Oral'."
+    )
+    dosis: Optional[str] = None
+    frecuencia_diaria: Optional[str] = None
 
 
 class SignosVitales(BaseModel):
