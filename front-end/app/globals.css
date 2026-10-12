@@ -49,38 +49,39 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Dirección A · Clínica cálida (Figma, Paso 6) */
+  --background: #f6f8fc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #2f6df6;
+  --primary-foreground: #ffffff;
+  --secondary: #e8effd;
+  --secondary-foreground: #1e4fd1;
+  --muted: #f0f3f9;
+  --muted-foreground: #64748b;
+  --accent: #e8effd;
+  --accent-foreground: #1e4fd1;
+  --destructive: #e5484d;
+  --border: #e3e8f1;
+  --input: #e3e8f1;
+  --ring: #9db8f9;
+  --chart-1: #2f6df6;
+  --chart-2: #5b8cf8;
+  --chart-3: #8aaefa;
+  --chart-4: #b8cffc;
+  --chart-5: #dbe7fe;
+  --radius: 1rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: #2f6df6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e8effd;
+  --sidebar-accent-foreground: #1e4fd1;
+  --sidebar-border: #e3e8f1;
+  --sidebar-ring: #9db8f9;
 }
 
 .dark {

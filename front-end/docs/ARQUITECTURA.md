@@ -109,17 +109,24 @@ colores ni radios nuevos.
   `unidad_edad` y `signos_vitales`). Los `Optional` de Pydantic son
   `T | null`; los enums son arreglos `as const` con su tipo unión, y sus
   valores coinciden literalmente con los del backend (verificado).
-- El acceso a datos pasa por una única capa, `lib/api.ts`, que hoy devuelve
-  datos de `lib/mocks/triajes.ts` (5 triajes: urgencia, rutina, ambiguo,
-  pediátrico y un segundo caso de auditoría). Apuntar al backend real implica
-  cambiar solo esa capa.
+- El acceso a datos pasa por una única puerta, `lib/api.ts`, que elige entre
+  dos implementaciones del contrato `RepositorioTriajes` (`lib/triajes/`):
+  `http.ts` (backend real) y `memoria.ts` (modo demo con `lib/mocks/triajes.ts`).
+  Páginas y Server Actions no saben cuál está activa.
 - `Triaje` extiende `TriageResponse` con `estado` (`recibidos`, `procesados`,
   `auditoria_humana`, `validados`) y `decision_auditoria`. Son campos solo del
   frontend que simulan las carpetas de OCI Object Storage.
 - El estado mock vive en memoria, en `globalThis`, para que páginas y Server
   Actions compartan instancia. Se reinicia con el servidor; no es persistencia.
-- Con `NEXT_PUBLIC_API_URL`, `procesarDocumento` llama al `POST /triage`
-  real. Historial, detalle y auditoría siguen en mock.
+- Con `API_URL` (solo servidor; `NEXT_PUBLIC_API_URL` se acepta por
+  compatibilidad) todo va al backend real. Si el backend falla, el error se
+  propaga a `app/error.tsx`: no hay caída silenciosa a datos de ejemplo, para no
+  mostrar pacientes ficticios como reales. Sin `API_URL` la app corre en modo
+  demo y lo avisa en la cabecera.
+- La respuesta del backend se valida (`adaptador.ts`) y las entradas de
+  formularios y Server Actions también (`lib/validacion.ts`).
+- La lógica sin interfaz vive en funciones puras con pruebas en Vitest
+  (`npm test`).
 
 ## 6. Dependencias del backend
 
@@ -129,9 +136,10 @@ colores ni radios nuevos.
   `UnidadEdad`, `SignosVitales` ni `MedicamentoPrescrito`, `medicamentos` es
   `list[str]` con un `dosis` aparte, y `TriageResponse` no incluye
   `canal_origen`.
-- Solo expone `GET /health` y `POST /triage`. Faltan endpoints para listar el
-  historial, obtener un triaje por id y resolver la auditoría; hasta entonces
-  esas funciones de `lib/api.ts` siguen en mock.
+- Actualización: el backend ya expone `GET /triage`, `GET /triage/{id}` y
+  `POST /triage/{id}/aprobar|rechazar`, y el frontend los consume. Siguen
+  faltando paginación o totales, OCR para imágenes y PDF escaneados, y
+  autenticación.
 
 ## 7. Otras decisiones
 

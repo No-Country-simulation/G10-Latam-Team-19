@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { listarAuditoria } from "@/lib/api";
-import { resolver } from "./actions";
+import { BotonesAuditoria } from "@/components/botones-auditoria";
+import { Confianza } from "@/components/confianza";
+import { PrioridadBadge } from "@/components/prioridad-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -8,47 +10,41 @@ export default async function AuditoriaPage() {
   const pendientes = await listarAuditoria();
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 space-y-4 px-4 py-8">
-      <h1 className="text-2xl font-semibold">Auditoría humana</h1>
+    <main className="mx-auto w-full max-w-6xl flex-1 space-y-4 px-4 pb-12 pt-6">
+      <h1 className="text-3xl font-bold tracking-tight">Auditoría humana</h1>
       <p className="text-muted-foreground">
         Documentos con baja confianza o datos faltantes que requieren revisión.
       </p>
 
       {pendientes.length === 0 && (
-        <p className="text-sm text-muted-foreground">No hay documentos pendientes.</p>
+        <p className="rounded-2xl bg-card p-6 text-sm text-muted-foreground ring-1 ring-foreground/5">
+          No hay documentos pendientes.
+        </p>
       )}
 
       <ul className="space-y-3">
         {pendientes.map((t) => (
-          <li key={t.documento_id} className="space-y-3 rounded-lg border p-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <Link
-                href={`/triaje/${t.documento_id}`}
-                className="font-medium underline-offset-4 hover:underline"
-              >
-                {t.documento_id}
-              </Link>
-              <span className="text-sm text-muted-foreground">
-                Confianza {Math.round(t.clasificacion.score_confianza_clasificacion * 100)}%
-              </span>
-            </div>
-            <p className="text-sm">{t.decision_enrutamiento.justificacion_enrutamiento}</p>
-            {t.decision_auditoria === "rechazado" ? (
-              <p className="text-sm font-medium text-destructive">Rechazado</p>
-            ) : (
-              <div className="flex gap-2">
-                <form action={resolver.bind(null, t.documento_id, "aprobado")}>
-                  <button type="submit" className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground">
-                    Aprobar
-                  </button>
-                </form>
-                <form action={resolver.bind(null, t.documento_id, "rechazado")}>
-                  <button type="submit" className="rounded-md border px-3 py-1.5 text-sm">
-                    Rechazar
-                  </button>
-                </form>
+          <li
+            key={t.documento_id}
+            className="space-y-3 rounded-2xl bg-card p-5 shadow-sm ring-1 ring-foreground/5"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href={`/triaje/${t.documento_id}`}
+                  className="font-semibold underline-offset-4 hover:underline"
+                >
+                  {t.documento_id}
+                </Link>
+                <PrioridadBadge nivel={t.clasificacion.nivel_prioridad} />
               </div>
-            )}
+              <Confianza valor={t.clasificacion.score_confianza_clasificacion} enRiesgo />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {t.clasificacion.tipo_documento} · {t.datos_extraidos.paciente.nombre}
+            </p>
+            <p className="text-sm">{t.decision_enrutamiento.justificacion_enrutamiento}</p>
+            <BotonesAuditoria id={t.documento_id} />
           </li>
         ))}
       </ul>
