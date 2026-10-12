@@ -82,7 +82,7 @@ CASOS = {
         },
     },
     "caso_5_pediatrico": {
-        "descripcion": "Pediátrico Seguro (Enrutamiento Directo)",
+        "descripcion": "Pediátrico febril (lactante, Emergencia)",
         "texto": (
             "Paciente masculino, 11 meses de edad. Madre consulta por "
             "síndrome febril agudo de 12 horas de evolución. Signos "
@@ -93,11 +93,10 @@ CASOS = {
             "6 horas en caso de fiebre."
         ),
         "esperado": {
-            # Conocido: la regla de lactantes (>38.0°C -> Urgente) contradice
-            # el "Prioritario" que espera este caso en el PDF (ver
-            # _pendiente_michelle). Puede dar Urgente -> Cola_Emergencia_Medica
-            # en vez de Farmacia_Hospitalaria hasta que Michelle lo resuelva.
-            "destino_final": "Farmacia_Hospitalaria",
+            # Michelle confirmó la regla de lactantes (>38.0°C -> Urgente):
+            # el resultado esperado del PDF (Farmacia) era el incorrecto.
+            "nivel_prioridad": "Urgente",
+            "destino_final": "Cola_Emergencia_Medica",
             "requires_human_review": False,
         },
     },
