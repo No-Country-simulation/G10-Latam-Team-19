@@ -21,6 +21,7 @@ Organiza los objetos en 4 "carpetas" (prefijos) dentro del bucket:
 from __future__ import annotations
 
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from enum import Enum
@@ -31,6 +32,7 @@ import oci
 from app.config import get_settings
 from app.schemas import EstadoDocumento
 
+logger = logging.getLogger("mediflow.oci")
 settings = get_settings()
 
 
@@ -228,6 +230,54 @@ class OCIStorageService:
         except Exception:
             pass
         return ruta_validado
+
+    def listar_documentos_triage(
+        self, estado: EstadoDocumento | str | None = None
+    ) -> list[tuple[str, dict[str, Any]]]:
+        """
+        Lista y descarga los documentos de triaje procesados desde OCI.
+        Si se especifica `estado`, filtra por la carpeta correspondiente:
+            - EstadoDocumento.PROCESADO -> /procesados/
+            - EstadoDocumento.AUDITORIA_HUMANA -> /auditoria_humana/
+            - EstadoDocumento.VALIDADO -> /validados/
+        Si no se especifica, busca en todas las carpetas de triaje (/procesados/, /auditoria_humana/, /validados/).
+        Excluye /recibidos/ ya que solo contiene documentos crudos sin procesar.
+        Devuelve una lista de tuplas (ruta_objeto, dict_contenido).
+        """
+        if isinstance(estado, str):
+            try:
+                estado = EstadoDocumento(estado)
+            except ValueError:
+                estado = None
+
+        carpetas = (
+            [_ESTADO_A_CARPETA[estado].value]
+            if estado is not None and estado in _ESTADO_A_CARPETA
+            else [
+                CarpetaOCI.PROCESADOS.value,
+                CarpetaOCI.AUDITORIA_HUMANA.value,
+                CarpetaOCI.VALIDADOS.value,
+            ]
+        )
+
+        resultados: list[tuple[str, dict[str, Any]]] = []
+        for carpeta in carpetas:
+            try:
+                objetos = self.listar_objetos(prefijo=f"{carpeta}/")
+            except Exception as exc:
+                logger.warning("No se pudieron listar objetos bajo '%s/' en OCI: %s", carpeta, exc)
+                continue
+
+            for obj in objetos:
+                if not obj.endswith(".json"):
+                    continue
+                try:
+                    data = self.descargar_json(obj)
+                    resultados.append((obj, data))
+                except Exception as exc:
+                    logger.warning("No se pudo descargar documento '%s' desde OCI: %s", obj, exc)
+
+        return resultados
 
 
 _service: OCIStorageService | None = None

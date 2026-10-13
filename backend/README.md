@@ -1,6 +1,6 @@
 # 🏥 MediFlow Backend
 
-Backend para el pipeline autónomo de triaje, extracción y enrutamiento inteligente de documentos clínicos desarrollado con **FastAPI** y **Oracle Cloud Infrastructure (OCI) Object Storage** (capa Always Free).
+Backend para el pipeline autónomo de triaje, extracción y enrutamiento inteligente de documentos clínicos desarrollado con **FastAPI**, **Oracle Cloud Infrastructure (OCI)** y **Cloudflare R2** como almacenamiento de objetos resiliente.
 
 ---
 
@@ -13,11 +13,12 @@ Backend para el pipeline autónomo de triaje, extracción y enrutamiento intelig
   - `POST /triage/{id}/aprobar`: Aprueba un documento en cola de auditoría humana; lo mueve de `/auditoria_humana/` a `/validados/`.
   - `POST /triage/{id}/rechazar`: Rechaza un documento en cola de auditoría humana; queda marcado como `"rechazado"` en `/auditoria_humana/`.
 - **CORS Habilitado:** Configurado para comunicarse con el servidor de desarrollo de Next.js (`http://localhost:3000`).
-- **Persistencia en OCI Object Storage:**
+- **Almacenamiento Conmutable (`STORAGE_PROVIDER=r2` o `oci`):**
   - `/recibidos/`: Guarda el documento crudo apenas ingresa al sistema.
   - `/procesados/`: Almacena el JSON con el resultado de triaje procesado.
   - `/auditoria_humana/`: Casos derivados a revisión humana.
   - `/validados/`: Casos auditados y aprobados por personal médico.
+  - **Conmutación sin tocar código:** Controlado mediante `STORAGE_PROVIDER` en `.env`. Permite usar Cloudflare R2 de forma activa y cambiar a OCI para la demo oficial.
 
 ---
 
