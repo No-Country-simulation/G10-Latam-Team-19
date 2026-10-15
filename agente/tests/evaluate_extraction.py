@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 from nodes import extraction_node
-from test_integration import CASOS
+from agente.tests.test_integration import CASOS
 
 # Expectativas de datos explícitos, independientes de prioridad/enrutamiento.
 EXPECTED = {
