@@ -81,13 +81,19 @@ class DocumentoClinicoRequest(BaseModel):
 
 class Clasificacion(BaseModel):
     tipo_documento: TipoDocumento
-    especialidad: str = Field(..., examples=["Radiología / Neumonología"])
+    especialidad: str
     nivel_prioridad: NivelPrioridad
     score_confianza_clasificacion: float = Field(..., ge=0.0, le=1.0)
 
 
+class ApoyoPrioridad(BaseModel):
+    nivel_prioridad: Optional[NivelPrioridad] = Field(
+        ..., description="Prioridad sustentada en diagnóstico/estudio; null si no hay evidencia suficiente."
+    )
+    justificacion: str = Field(..., min_length=1)
+
+
 class Paciente(BaseModel):
-    # Opcional: el agente devuelve null si el documento no trae nombre (no penaliza el score).
     nombre: Optional[str] = None
     edad: Optional[int] = Field(None, ge=0, le=130)
     unidad_edad: Optional[UnidadEdad] = Field(
@@ -125,9 +131,12 @@ class ViaAdministracion(str, Enum):
 
 class MedicamentoPrescrito(BaseModel):
     nombre: str
+    via: Optional[ViaAdministracion] = Field(
+        None,
+        description="Vía de administración normalizada. Si el texto dice 'por boca', mapear a 'Oral'."
+    )
     dosis: Optional[str] = None
     frecuencia_diaria: Optional[str] = None
-    via: Optional[ViaAdministracion] = None
 
 
 class SignosVitales(BaseModel):
