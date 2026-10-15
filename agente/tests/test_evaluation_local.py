@@ -1,7 +1,7 @@
 """Verifica que el evaluador detecta errores materiales sin llamadas al proveedor."""
 import copy
 import unittest
-from evaluate_extraction import compare
+from agente.tests.evaluate_extraction import compare
 
 PEDIATRIC = {
     "paciente": {"nombre": None, "documento_identidad": None, "edad": 11, "unidad_edad": "meses", "sexo": "M"},
