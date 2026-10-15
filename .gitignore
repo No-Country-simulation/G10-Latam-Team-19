@@ -1,5 +1,24 @@
-.venv/
-.tmp/
+# Python
 __pycache__/
 *.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Secretos y configuración local
 .env
+.env.*
+!.env.example
+
+# Sistema operativo y editores
+.DS_Store
+.idea/
+.vscode/
+
+# Worktrees locales de Claude Code
+.claude/worktrees/
+
+# Bitácora personal
+avances.txt
