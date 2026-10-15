@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -203,8 +203,12 @@ class AlmacenamientoOCI(BaseModel):
 # Response: lo que devuelve el endpoint (y lo que persiste el agente)
 # --------------------
 
+DecisionAuditoria = Literal["aprobado", "rechazado"]
+
+
 class TriageResponse(BaseModel):
-    status: EstadoDocumento = Field(default=EstadoDocumento.PROCESADO)
+    # Siempre un valor de EstadoDocumento: procesados | auditoria_humana | validados.
+    status: str = Field(default=EstadoDocumento.PROCESADO.value)
     documento_id: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     clasificacion: Clasificacion
@@ -212,6 +216,9 @@ class TriageResponse(BaseModel):
     decision_enrutamiento: DecisionEnrutamiento
     almacenamiento_oci: Optional[AlmacenamientoOCI] = None
     canal_origen: str
+    # Resultado de la auditoría humana. None mientras el caso no fue revisado.
+    # "rechazado" deja el documento en auditoria_humana (status no cambia).
+    decision_auditoria: Optional[DecisionAuditoria] = None
 
 
 # --------------------
@@ -220,7 +227,7 @@ class TriageResponse(BaseModel):
 
 if __name__ == "__main__":
     ejemplo = {
-        "status": EstadoDocumento.PROCESADO,
+        "status": "procesados",
         "documento_id": "DOC-CLIN-2026-8942",
         "canal_origen": "Guardia_Emergencias",
         "clasificacion": {
