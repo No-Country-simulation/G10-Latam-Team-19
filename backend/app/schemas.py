@@ -221,6 +221,17 @@ class TriageResponse(BaseModel):
     decision_auditoria: Optional[DecisionAuditoria] = None
 
 
+class DashboardResponse(BaseModel):
+    """Métricas agregadas para la pantalla /dashboard."""
+    total: int = Field(..., ge=0)
+    pct_resueltos_por_agente: int = Field(..., ge=0, le=100)
+    pct_con_intervencion: int = Field(..., ge=0, le=100)
+    confianza_media: int = Field(..., ge=0, le=100)   # media de score_confianza_clasificacion, en %
+    por_prioridad: dict[str, int]   # {"Rutina": 1, "Prioritario": 1, "Urgente": 1}
+    por_estado: dict[str, int]      # {"recibidos": 0, "procesados": 2, "auditoria_humana": 0, "validados": 1}
+    por_destino: dict[str, int]     # {"Cola_Emergencia_Medica": 1, ...}
+
+
 # --------------------
 # Auto-test para corroborar que este archivo funciona
 # --------------------
