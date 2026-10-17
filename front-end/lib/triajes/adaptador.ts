@@ -32,7 +32,7 @@ export function esTriageResponse(v: unknown): v is TriageResponse {
 }
 
 function inferirEstado(r: TriageResponse): EstadoDocumento {
-  if (r.status === "validado") return "validados";
+  if (r.status === "validados") return "validados";
   // Un rechazado se queda en la carpeta de auditoría, pero marcado.
   if (r.status === "rechazado") return "auditoria_humana";
   return r.decision_enrutamiento.requiere_auditoria_humana ? "auditoria_humana" : "procesados";
