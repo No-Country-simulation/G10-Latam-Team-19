@@ -47,15 +47,12 @@ export interface ResumenTriajes {
 export function resumirTriajes(triajes: Triaje[]): ResumenTriajes {
   const total = triajes.length;
   const conIntervencion = triajes.filter(
-    (t) => t.decision_enrutamiento.requiere_auditoria_humana,
+    (t) => t.estado === "auditoria_humana" || t.decision_auditoria !== null,
   ).length;
   const sumaConfianza = triajes.reduce(
     (acc, t) => acc + t.clasificacion.score_confianza_clasificacion,
     0,
   );
-  const conIntervencion = triajes.filter(
-    (t) => t.estado === "auditoria_humana" || t.decision_auditoria !== null,
-  ).length;
 
   return {
     total,
