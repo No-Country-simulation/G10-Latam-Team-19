@@ -26,10 +26,8 @@ from pydantic import BaseModel
 from app.config import get_settings
 from app.schemas import (
     AlmacenamientoOCI,
-    DashboardResponse,
     DocumentoClinicoRequest,
     EstadoDocumento,
-    NivelPrioridad,
     TriageResponse,
 )
 from app.services.agente import AgenteError, ejecutar_agente
@@ -368,85 +366,3 @@ def rechazar_documento(documento_id: str, revision: RevisionHumanaRequest | None
     "auditoria_humana". Un caso rechazado puede aprobarse después (segunda revisión).
     """
     return _resolver_auditoria(documento_id, "rechazado", revision)
-
-def _pct(parte: int, total: int) -> int:
-    return round(parte / total * 100) if total else 0
-
-
-def _intervino_humano(doc: TriageResponse) -> bool:
-    # No usar requiere_auditoria_humana: al aprobar se pone en False y el caso
-    # pasaría a contarse como "resuelto por el agente".
-    return (
-        doc.status in (EstadoDocumento.AUDITORIA_HUMANA.value, EstadoDocumento.VALIDADO.value)
-        or doc.decision_auditoria is not None
-    )
-
-
-@app.get("/dashboard", response_model=DashboardResponse, tags=["Dashboard"],
-         summary="Métricas agregadas de triaje")
-def dashboard() -> DashboardResponse:
-    docs = listar_historial_triage()          # reutiliza la lectura de /triage
-    total = len(docs)
-    con_intervencion = sum(_intervino_humano(d) for d in docs)
-
-    por_prioridad = {n.value: 0 for n in NivelPrioridad}
-    por_estado = {e.value: 0 for e in EstadoDocumento}
-    por_destino: dict[str, int] = {}
-    for d in docs:
-        por_prioridad[d.clasificacion.nivel_prioridad.value] += 1
-        por_estado[d.status] = por_estado.get(d.status, 0) + 1
-        destino = d.decision_enrutamiento.destino_principal.value
-        por_destino[destino] = por_destino.get(destino, 0) + 1
-
-    return DashboardResponse(
-        total=total,
-        pct_resueltos_por_agente=_pct(total - con_intervencion, total),
-        pct_con_intervencion=_pct(con_intervencion, total),
-        confianza_media=round(
-            sum(d.clasificacion.score_confianza_clasificacion for d in docs) / total * 100
-        ) if total else 0,
-        por_prioridad=por_prioridad,
-        por_estado=por_estado,
-        por_destino=por_destino,
-    )
-
-def _pct(parte: int, total: int) -> int:
-    return round(parte / total * 100) if total else 0
-
-
-def _intervino_humano(doc: TriageResponse) -> bool:
-    # No usar requiere_auditoria_humana: al aprobar se pone en False y el caso
-    # pasaría a contarse como "resuelto por el agente".
-    return (
-        doc.status in (EstadoDocumento.AUDITORIA_HUMANA.value, EstadoDocumento.VALIDADO.value)
-        or doc.decision_auditoria is not None
-    )
-
-
-@app.get("/dashboard", response_model=DashboardResponse, tags=["Dashboard"],
-         summary="Métricas agregadas de triaje")
-def dashboard() -> DashboardResponse:
-    docs = listar_historial_triage()          # reutiliza la lectura de /triage
-    total = len(docs)
-    con_intervencion = sum(_intervino_humano(d) for d in docs)
-
-    por_prioridad = {n.value: 0 for n in NivelPrioridad}
-    por_estado = {e.value: 0 for e in EstadoDocumento}
-    por_destino: dict[str, int] = {}
-    for d in docs:
-        por_prioridad[d.clasificacion.nivel_prioridad.value] += 1
-        por_estado[d.status] = por_estado.get(d.status, 0) + 1
-        destino = d.decision_enrutamiento.destino_principal.value
-        por_destino[destino] = por_destino.get(destino, 0) + 1
-
-    return DashboardResponse(
-        total=total,
-        pct_resueltos_por_agente=_pct(total - con_intervencion, total),
-        pct_con_intervencion=_pct(con_intervencion, total),
-        confianza_media=round(
-            sum(d.clasificacion.score_confianza_clasificacion for d in docs) / total * 100
-        ) if total else 0,
-        por_prioridad=por_prioridad,
-        por_estado=por_estado,
-        por_destino=por_destino,
-    )

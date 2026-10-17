@@ -10,7 +10,6 @@ Backend para el pipeline autónomo de triaje, extracción y enrutamiento intelig
   - `POST /triage`: Recibe `DocumentoClinicoRequest`, persiste el crudo en `/recibidos/`, clasifica/extrae entidades y responde con `TriageResponse`.
   - `GET /triage`: Devuelve la lista de documentos de triaje para la vista `/historial` de Frontend.
   - `GET /triage/{id}`: Devuelve el detalle del documento procesado para la ruta dinámica `/triaje/[id]`.
-  - `GET /dashboard`: Devuelve métricas agregadas (totales, % resuelto por el agente vs. intervención humana, confianza media y distribución por prioridad, estado y destino)  para la vista `/dashboard` de Frontend.
   - `POST /triage/{id}/aprobar`: Aprueba un documento en cola de auditoría humana; lo mueve de `/auditoria_humana/` a `/validados/`.
   - `POST /triage/{id}/rechazar`: Rechaza un documento en cola de auditoría humana; queda marcado como `"rechazado"` en `/auditoria_humana/`.
 - **CORS Habilitado:** Configurado para comunicarse con el servidor de desarrollo de Next.js (`http://localhost:3000`).
@@ -157,22 +156,6 @@ El backend estará disponible en:
 - **Errores:** igual que `/aprobar`.
 - El documento permanece en `/auditoria_humana/` (el brief no define una carpeta `/rechazados/` separada).
 
-### 6. `GET /dashboard` (Métricas - `/dashboard`)
-- **Respuesta:** `DashboardResponse`. Los porcentajes son enteros de 0 a 100.
-```json
-  {
-    "total": 3,
-    "pct_resueltos_por_agente": 67,
-    "pct_con_intervencion": 33,
-    "confianza_media": 89,
-    "por_prioridad": { "Rutina": 1, "Prioritario": 1, "Urgente": 1 },
-    "por_estado": { "recibidos": 0, "procesados": 2, "auditoria_humana": 0, "validados": 1 },
-    "por_destino": { "Cola_Emergencia_Medica": 1, "Cola_Revision_Humana": 1, "Historia_Clinica_Electronica": 1 }
-  }
-```
-- **Intervención humana:** cuenta todo caso con `status` en `auditoria_humana` o `validados`, o con `decision_auditoria`. No depende de `requiere_auditoria_humana`, porque pasa a `false` al aprobar.
-- Reutiliza la lectura de `GET /triage`, así que no requiere almacenamiento adicional.
-
 ---
 
 ## 📁 Estructura del Código
@@ -181,7 +164,7 @@ El backend estará disponible en:
 app/
 ├── schemas.py           # Schemas oficiales Pydantic (DocumentoClinicoRequest, TriageResponse, Enums)
 ├── config.py            # Gestión centralizada de configuración mediante Settings
-├── main.py              # Aplicación FastAPI, CORS y endpoints (POST /triage, GET /triage, GET /triage/{id}, GET /dashboard)
+├── main.py              # Aplicación FastAPI, CORS y endpoints (POST /triage, GET /triage, GET /triage/{id})
 └── services/
     └── oci_storage.py   # Servicio de integración con OCI Object Storage y prefijos
 ```
