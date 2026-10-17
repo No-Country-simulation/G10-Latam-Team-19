@@ -53,6 +53,9 @@ export function resumirTriajes(triajes: Triaje[]): ResumenTriajes {
     (acc, t) => acc + t.clasificacion.score_confianza_clasificacion,
     0,
   );
+  const conIntervencion = triajes.filter(
+    (t) => t.estado === "auditoria_humana" || t.decision_auditoria !== null,
+  ).length;
 
   return {
     total,

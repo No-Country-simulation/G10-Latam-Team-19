@@ -65,6 +65,23 @@ describe("contarPor", () => {
   });
 });
 
+describe("resumirTriajes con la forma REAL del backend", () => {
+  const aprobadoReal = adaptarTriaje({
+    ...triageDePrueba({ documento_id: "DOC-R1", status: "validados" as never }),
+    decision_auditoria: "aprobado",
+  });
+  const rechazadoReal = adaptarTriaje({
+    ...conAuditoria({ documento_id: "DOC-R2", status: "auditoria_humana" as never }),
+    decision_auditoria: "rechazado",
+  });
+
+  it("cuenta como intervención los casos ya revisados, aunque requiere_auditoria_humana sea false", () => {
+    const r = resumirTriajes([rutina, urgente, aprobadoReal, rechazadoReal]);
+    expect(r.pctConIntervencion).toBe(50);
+    expect(r.pctResueltosPorAgente).toBe(50);
+  });
+});
+
 describe("resumirTriajes", () => {
   it("devuelve ceros sin documentos", () => {
     expect(resumirTriajes([])).toEqual({
