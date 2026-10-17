@@ -164,6 +164,10 @@ def triage_documento(documento: DocumentoClinicoRequest) -> TriageResponse:
         if resultado.decision_enrutamiento.requiere_auditoria_humana
         else EstadoDocumento.PROCESADO
     )
+
+    if resultado.score_confianza is not None:
+        resultado.clasificacion.score_confianza_clasificacion = resultado.score_confianza
+
     respuesta = TriageResponse(
         status=estado.value,
         documento_id=documento.documento_id,
