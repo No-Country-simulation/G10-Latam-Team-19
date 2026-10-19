@@ -27,7 +27,7 @@ export function TriajesTabla({ triajes }: { triajes: Triaje[] }) {
               <p className="text-sm">{t.datos_extraidos.paciente.nombre ?? "—"}</p>
               <p className="text-sm text-muted-foreground">{t.clasificacion.tipo_documento}</p>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <EstadoBadge estado={t.estado} />
+                <EstadoBadge triaje={t} />
                 <Confianza
                   valor={t.clasificacion.score_confianza_clasificacion}
                   enRiesgo={t.decision_enrutamiento.requiere_auditoria_humana}
@@ -72,7 +72,7 @@ export function TriajesTabla({ triajes }: { triajes: Triaje[] }) {
                 />
               </td>
               <td className="px-3 py-2">
-                <EstadoBadge estado={t.estado} />
+                <EstadoBadge triaje={t} />
               </td>
               <td className="px-3 py-2">{formatearFecha(t.timestamp)}</td>
             </tr>

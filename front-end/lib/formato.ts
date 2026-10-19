@@ -1,5 +1,14 @@
 import type { DestinoEnrutamiento } from "@/types/triage";
+import type { EstadoVisible } from "@/lib/triajes/consultas";
 import { CANALES, type Canal } from "@/lib/validacion";
+
+export const ETIQUETA_ESTADO: Record<EstadoVisible, string> = {
+  recibidos: "Recibido",
+  procesados: "Procesado",
+  auditoria_humana: "En auditoría",
+  validados: "Validado",
+  rechazados: "Rechazado",
+};
 
 const FECHA = new Intl.DateTimeFormat("es", {
   dateStyle: "short",

@@ -2,19 +2,19 @@ import Link from "next/link";
 import { Bot, FileText, Gauge, UserCheck } from "lucide-react";
 import { listarTriajes } from "@/lib/api";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { etiquetaDestino } from "@/lib/formato";
-import { contarPor, porcentaje, resumirTriajes } from "@/lib/triajes/consultas";
+import { ETIQUETA_ESTADO, etiquetaDestino } from "@/lib/formato";
+import {
+  contarPor,
+  estadoVisible,
+  porcentaje,
+  resumirTriajes,
+  type EstadoVisible,
+} from "@/lib/triajes/consultas";
 import { cn } from "@/lib/utils";
-import { NIVELES_PRIORIDAD, type EstadoDocumento } from "@/types/triage";
+import { NIVELES_PRIORIDAD } from "@/types/triage";
 
 export const dynamic = "force-dynamic";
 
-const ETIQUETA_ESTADO: Record<EstadoDocumento, string> = {
-  recibidos: "Recibido",
-  procesados: "Procesado",
-  auditoria_humana: "En auditoría",
-  validados: "Validado",
-};
 
 const COLOR_PRIORIDAD: Record<string, string> = {
   Urgente: "bg-destructive",
@@ -73,7 +73,7 @@ export default async function DashboardPage() {
 
   const porPrioridad = contarPor(triajes, (t) => t.clasificacion.nivel_prioridad);
   const porDestino = contarPor(triajes, (t) => t.decision_enrutamiento.destino_principal);
-  const porEstado = contarPor(triajes, (t) => t.estado);
+  const porEstado = contarPor(triajes, estadoVisible);
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 space-y-8 px-4 pb-12 pt-6">
@@ -120,7 +120,7 @@ export default async function DashboardPage() {
           <Distribucion
             titulo="Por estado"
             total={total}
-            items={(Object.keys(ETIQUETA_ESTADO) as EstadoDocumento[]).map((e) => ({
+            items={(Object.keys(ETIQUETA_ESTADO) as EstadoVisible[]).map((e) => ({
               etiqueta: ETIQUETA_ESTADO[e],
               cantidad: porEstado.get(e) ?? 0,
             }))}

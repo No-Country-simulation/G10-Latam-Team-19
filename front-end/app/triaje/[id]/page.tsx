@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Activity, ArrowLeft, Pill, Route, ShieldAlert, UserCheck } from "lucide-react";
+import { Activity, ArrowLeft, Pill, Route, ShieldAlert, UserCheck, UserX } from "lucide-react";
 import { obtenerTriaje } from "@/lib/api";
+import { estadoVisible } from "@/lib/triajes/consultas";
 import { Badge } from "@/components/ui/badge";
 import { EstadoBadge } from "@/components/estado-badge";
 import { PrioridadBadge } from "@/components/prioridad-badge";
@@ -40,6 +41,7 @@ export default async function TriajePage({ params }: PageProps<"/triaje/[id]">) 
   const { clasificacion, datos_extraidos: d, decision_enrutamiento: dec } = t;
   const { paciente, signos_vitales: sv } = d;
   const requiereAuditoria = dec.requiere_auditoria_humana;
+  const rechazado = estadoVisible(t) === "rechazados";
   const urgente = clasificacion.nivel_prioridad === "Urgente";
 
   const edad =
@@ -68,12 +70,7 @@ export default async function TriajePage({ params }: PageProps<"/triaje/[id]">) 
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <PrioridadBadge nivel={clasificacion.nivel_prioridad} />
-          <EstadoBadge estado={t.estado} />
-          {t.decision_auditoria && (
-            <Badge variant={t.decision_auditoria === "rechazado" ? "destructive" : "secondary"}>
-              {t.decision_auditoria === "rechazado" ? "Rechazado" : "Aprobado"}
-            </Badge>
-          )}
+          <EstadoBadge triaje={t} />
         </div>
       </div>
 
@@ -92,21 +89,33 @@ export default async function TriajePage({ params }: PageProps<"/triaje/[id]">) 
         </div>
       )}
 
-      {requiereAuditoria && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-secondary/60 p-5">
-          <div className="flex items-start gap-3">
-            <UserCheck className="mt-0.5 size-5 text-primary" />
-            <div>
-              <p className="font-semibold">Requiere auditoría humana</p>
-              {!urgente && (
-                <p className="text-sm text-muted-foreground">{dec.justificacion_enrutamiento}</p>
-              )}
-            </div>
+      {rechazado ? (
+        <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-5">
+          <UserX className="mt-0.5 size-5 text-destructive" />
+          <div>
+            <p className="font-semibold">Rechazado por revisor humano</p>
+            {!urgente && (
+              <p className="text-sm text-muted-foreground">{dec.justificacion_enrutamiento}</p>
+            )}
           </div>
-          <Link href="/auditoria" className="text-sm font-medium text-primary underline-offset-4 hover:underline">
-            Ir a la cola de auditoría
-          </Link>
         </div>
+      ) : (
+        requiereAuditoria && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-secondary/60 p-5">
+            <div className="flex items-start gap-3">
+              <UserCheck className="mt-0.5 size-5 text-primary" />
+              <div>
+                <p className="font-semibold">Requiere auditoría humana</p>
+                {!urgente && (
+                  <p className="text-sm text-muted-foreground">{dec.justificacion_enrutamiento}</p>
+                )}
+              </div>
+            </div>
+            <Link href="/auditoria" className="text-sm font-medium text-primary underline-offset-4 hover:underline">
+              Ir a la cola de auditoría
+            </Link>
+          </div>
+        )
       )}
 
       <div className="grid gap-4 md:grid-cols-[2fr_1fr]">

@@ -3,6 +3,7 @@ import { adaptarTriaje } from "./adaptador";
 import {
   buscarTriajes,
   contarPor,
+  estadoVisible,
   filtrarPendientesAuditoria,
   porcentaje,
   resumirTriajes,
@@ -104,5 +105,19 @@ describe("resumirTriajes", () => {
       pctConIntervencion: 50,
       confianzaMedia: 93, // (0.9 + 1 + 0.9 + 0.9) / 4 = 0.925
     });
+  });
+});
+
+describe("estadoVisible", () => {
+  it("muestra como rechazado un caso rechazado que sigue en auditoría", () => {
+    expect(estadoVisible({ estado: "auditoria_humana", decision_auditoria: "rechazado" })).toBe("rechazados");
+  });
+
+  it("deja en auditoría un caso todavía sin revisar", () => {
+    expect(estadoVisible({ estado: "auditoria_humana", decision_auditoria: null })).toBe("auditoria_humana");
+  });
+
+  it("un caso rechazado y luego aprobado se ve validado", () => {
+    expect(estadoVisible({ estado: "validados", decision_auditoria: "aprobado" })).toBe("validados");
   });
 });

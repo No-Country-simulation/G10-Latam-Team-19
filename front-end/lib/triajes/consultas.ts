@@ -1,4 +1,12 @@
+import type { EstadoDocumento } from "@/types/triage";
 import type { Triaje } from "./tipos";
+
+/** Estado que ve el usuario: agrega "rechazados", que en el backend sigue en auditoria_humana. */
+export type EstadoVisible = EstadoDocumento | "rechazados";
+
+export function estadoVisible(t: Pick<Triaje, "estado" | "decision_auditoria">): EstadoVisible {
+  return t.estado === "auditoria_humana" && t.decision_auditoria === "rechazado" ? "rechazados" : t.estado;
+}
 
 /** Casos que esperan una decisión humana (los rechazados ya fueron resueltos). */
 export function filtrarPendientesAuditoria(triajes: Triaje[]): Triaje[] {
