@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { startTransition, useActionState, useRef, useState } from "react";
 import { ArrowRight, ChevronDown, FileText, Loader2, Upload, X } from "lucide-react";
 import { cargarDocumento, type EstadoCarga } from "@/app/actions";
 import {
@@ -79,7 +79,16 @@ export function CargarDocumento() {
       : Boolean(archivo?.texto && !archivo.aviso && !leyendo);
 
   return (
-    <form action={accion} className="space-y-5 rounded-3xl bg-card p-5 shadow-lg ring-1 ring-foreground/5">
+    <form
+      // onSubmit en lugar de action={accion}: con `action`, React resetea el formulario al
+      // terminar y, tras un error, el canal volvía al valor por defecto sin que se notara.
+      onSubmit={(e) => {
+        e.preventDefault();
+        const datos = new FormData(e.currentTarget);
+        startTransition(() => accion(datos));
+      }}
+      className="space-y-5 rounded-3xl bg-card p-5 shadow-lg ring-1 ring-foreground/5"
+    >
       <div role="tablist" className="inline-flex gap-1 rounded-xl bg-muted/70 p-1 text-sm">
         {(
           [
