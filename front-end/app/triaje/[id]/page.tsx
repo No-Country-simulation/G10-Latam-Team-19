@@ -207,7 +207,7 @@ export default async function TriajePage({ params }: PageProps<"/triaje/[id]">) 
         <p className="mt-2 text-sm text-muted-foreground">{dec.justificacion_enrutamiento}</p>
         {t.almacenamiento_oci?.ruta_objeto && (
           <p className="mt-3 border-t pt-3 font-mono text-xs text-muted-foreground">
-            Guardado en OCI · {t.almacenamiento_oci.ruta_objeto}
+            Guardado en almacenamiento · {t.almacenamiento_oci.ruta_objeto}
           </p>
         )}
       </Panel>
