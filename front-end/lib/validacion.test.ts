@@ -16,6 +16,11 @@ describe("validarCarga", () => {
     });
   });
 
+  it("envía el canal en el formato del agente", () => {
+    const r = validarCarga({ ...valida, canal: "Guardia_Emergencias" });
+    expect(r.ok && r.datos.canal_origen).toBe("Guardia_Emergencias");
+  });
+
   it.each(["JSON", "PDF"])("acepta el tipo %s", (tipo) => {
     expect(validarCarga({ ...valida, tipo }).ok).toBe(true);
   });
@@ -27,6 +32,8 @@ describe("validarCarga", () => {
     ["un archivo en lugar de texto", { texto: new Blob(["contenido largo"]) }],
     ["texto demasiado largo", { texto: "a".repeat(MAX_TEXTO + 1) }],
     ["canal fuera de la lista", { canal: "Canal inventado" }],
+    ["canal con el texto visible en lugar del valor", { canal: "Guardia de Emergencias" }],
+    ["canal heredado del prototipo de objetos", { canal: "toString" }],
     ["canal ausente", { canal: null }],
     ["tipo IMAGEN (requiere OCR)", { tipo: "IMAGEN" }],
     ["tipo desconocido", { tipo: "EXE" }],

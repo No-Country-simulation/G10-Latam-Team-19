@@ -1,12 +1,16 @@
 import type { DocumentoClinicoRequest, TipoArchivo } from "@/types/triage";
 import { DECISIONES_AUDITORIA, type DecisionAuditoria } from "@/lib/triajes/tipos";
 
-export const CANALES = [
-  "Guardia de Emergencias",
-  "Consultorio Externo",
-  "Laboratorio",
-  "Farmacia",
-] as const;
+/** Valor que se envía (formato del agente: "Guardia_Emergencias") → texto que ve el usuario. */
+export const CANALES = {
+  Guardia_Emergencias: "Guardia de Emergencias",
+  Consultorio_Externo: "Consultorio Externo",
+  Laboratorio: "Laboratorio",
+  Farmacia: "Farmacia",
+} as const;
+export type Canal = keyof typeof CANALES;
+
+const esCanal = (v: unknown): v is Canal => typeof v === "string" && Object.hasOwn(CANALES, v);
 
 /** Mínimo que exige el backend (schemas.py: documento_texto min_length=10). */
 export const MIN_TEXTO = 10;
@@ -36,8 +40,8 @@ export function validarCarga(entrada: {
     return { ok: false, error: "El documento es demasiado largo para procesarlo." };
   }
 
-  const canal = CANALES.find((c) => c === entrada.canal);
-  if (!canal) return { ok: false, error: "Elegí un canal de origen válido." };
+  const canal = entrada.canal;
+  if (!esCanal(canal)) return { ok: false, error: "Elegí un canal de origen válido." };
 
   const tipo = TIPOS_ENVIABLES.find((t) => t === entrada.tipo);
   if (!tipo) return { ok: false, error: "Tipo de archivo no soportado." };

@@ -217,8 +217,10 @@ export function CargarDocumento() {
             name="canal_origen"
             className="w-full appearance-none bg-transparent pr-6 text-sm font-medium outline-none"
           >
-            {CANALES.map((c) => (
-              <option key={c}>{c}</option>
+            {Object.entries(CANALES).map(([valor, etiqueta]) => (
+              <option key={valor} value={valor}>
+                {etiqueta}
+              </option>
             ))}
           </select>
           <ChevronDown className="pointer-events-none absolute top-1/2 right-4 size-4 -translate-y-1/2 text-muted-foreground" />

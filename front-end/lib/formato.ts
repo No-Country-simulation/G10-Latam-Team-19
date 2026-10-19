@@ -1,4 +1,5 @@
 import type { DestinoEnrutamiento } from "@/types/triage";
+import { CANALES, type Canal } from "@/lib/validacion";
 
 const FECHA = new Intl.DateTimeFormat("es", {
   dateStyle: "short",
@@ -23,4 +24,9 @@ const DESTINOS: Record<DestinoEnrutamiento, string> = {
 /** Nombre legible del destino; si el backend agrega uno nuevo, se muestra sin guiones bajos. */
 export function etiquetaDestino(destino: string): string {
   return DESTINOS[destino as DestinoEnrutamiento] ?? destino.replaceAll("_", " ");
+}
+
+/** Nombre legible del canal de origen; los que no están en la lista se muestran sin guiones bajos. */
+export function etiquetaCanal(canal: string): string {
+  return CANALES[canal as Canal] ?? canal.replaceAll("_", " ");
 }

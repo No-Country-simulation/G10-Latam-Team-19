@@ -5,7 +5,7 @@ import { obtenerTriaje } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { EstadoBadge } from "@/components/estado-badge";
 import { PrioridadBadge } from "@/components/prioridad-badge";
-import { etiquetaDestino, formatearFecha } from "@/lib/formato";
+import { etiquetaCanal, etiquetaDestino, formatearFecha } from "@/lib/formato";
 import { cn } from "@/lib/utils";
 import { esIdDocumento } from "@/lib/validacion";
 
@@ -63,7 +63,7 @@ export default async function TriajePage({ params }: PageProps<"/triaje/[id]">) 
           </Link>
           <span>/</span>
           <span>
-            {t.documento_id} · {t.canal_origen} · {formatearFecha(t.timestamp)} UTC
+            {t.documento_id} · {etiquetaCanal(t.canal_origen)} · {formatearFecha(t.timestamp)} UTC
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
