@@ -68,7 +68,7 @@ export interface Clasificacion {
 }
 
 export interface Paciente {
-  nombre: string;
+  nombre: string | null;
   /** 0–130. */
   edad: number | null;
   unidad_edad: UnidadEdad | null;
@@ -79,7 +79,7 @@ export interface Paciente {
 }
 
 export interface MedicoSolicitante {
-  nombre: string;
+  nombre: string | null;
   matricula: string | null;
 }
 

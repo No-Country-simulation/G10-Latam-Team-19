@@ -41,7 +41,7 @@ export default async function AuditoriaPage() {
               <Confianza valor={t.clasificacion.score_confianza_clasificacion} enRiesgo />
             </div>
             <p className="text-sm text-muted-foreground">
-              {t.clasificacion.tipo_documento} · {t.datos_extraidos.paciente.nombre}
+              {[t.clasificacion.tipo_documento, t.datos_extraidos.paciente.nombre].filter(Boolean).join(" · ")}
             </p>
             <p className="text-sm">{t.decision_enrutamiento.justificacion_enrutamiento}</p>
             <BotonesAuditoria id={t.documento_id} />

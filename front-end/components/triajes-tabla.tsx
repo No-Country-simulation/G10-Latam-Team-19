@@ -24,7 +24,7 @@ export function TriajesTabla({ triajes }: { triajes: Triaje[] }) {
                 <span className="min-w-0 font-medium break-words">{t.documento_id}</span>
                 <PrioridadBadge nivel={t.clasificacion.nivel_prioridad} />
               </div>
-              <p className="text-sm">{t.datos_extraidos.paciente.nombre}</p>
+              <p className="text-sm">{t.datos_extraidos.paciente.nombre ?? "—"}</p>
               <p className="text-sm text-muted-foreground">{t.clasificacion.tipo_documento}</p>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <EstadoBadge estado={t.estado} />
@@ -60,7 +60,7 @@ export function TriajesTabla({ triajes }: { triajes: Triaje[] }) {
                   {t.documento_id}
                 </Link>
               </td>
-              <td className="px-3 py-2">{t.datos_extraidos.paciente.nombre}</td>
+              <td className="px-3 py-2">{t.datos_extraidos.paciente.nombre ?? "—"}</td>
               <td className="px-3 py-2">{t.clasificacion.tipo_documento}</td>
               <td className="px-3 py-2">
                 <PrioridadBadge nivel={t.clasificacion.nivel_prioridad} />

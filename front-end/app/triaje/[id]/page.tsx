@@ -45,7 +45,12 @@ export default async function TriajePage({ params }: PageProps<"/triaje/[id]">) 
   const edad =
     paciente.edad === null ? null : `${paciente.edad} ${paciente.unidad_edad ?? ""}`.trim();
   const medico = d.medico_solicitante
-    ? `${d.medico_solicitante.nombre}${d.medico_solicitante.matricula ? ` · MP ${d.medico_solicitante.matricula}` : ""}`
+    ? [
+        d.medico_solicitante.nombre,
+        d.medico_solicitante.matricula && `MP ${d.medico_solicitante.matricula}`,
+      ]
+        .filter(Boolean)
+        .join(" · ") || null
     : null;
 
   return (
