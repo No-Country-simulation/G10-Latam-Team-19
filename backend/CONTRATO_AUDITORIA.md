@@ -30,11 +30,13 @@ Mismo body. Respuesta 200: `status="auditoria_humana"`, `decision_auditoria="rec
 ### Errores (cuerpo `{ "detail": "..." }`)
 | Código | Cuándo |
 | --- | --- |
-| 404 | El documento no existe (ni en memoria ni en OCI). |
+| 404 | El documento no existe (ni en memoria ni en OCI/R2). |
 | 409 | El documento no está en `auditoria_humana` (p. ej. ya fue validado). *(antes 400)* |
-| 502 | OCI configurado pero falló al guardar; el caso **sigue pendiente**, reintentar. |
+| 429 | Límite de uso del proveedor de IA (LLM) alcanzado (Rate Limit / tokens por minuto). Devuelve cabecera `Retry-After: 60` y mensaje `"Servicio ocupado por límite de uso del proveedor de IA. Por favor, intentá en un minuto."`. |
+| 502 | Falló el almacenamiento (OCI/R2) o el agente falló por un error interno no recuperable. |
+| 503 | Agente mal configurado (p. ej. falta API key o directorio del agente no encontrado). |
 
-`POST /triage` además puede devolver **503** (agente mal configurado, p. ej. falta API key) o **502** (el agente falló al procesar). En ese caso el crudo queda en `/recibidos/`.
+`POST /triage` guarda el documento crudo en `/recibidos/` antes de procesar, garantizando que no se pierdan datos aunque el agente falle (502, 503 o 429). En caso de 429, el cliente o frontend puede informar al usuario que intente en un minuto sin necesidad de reescribir su consulta.
 
 ## Mapeo sugerido en `lib/api.ts`
 `estado = status` · `decision_auditoria = decision_auditoria` · `listarAuditoria() = GET /triage?estado=auditoria_humana` · `resolverAuditoria(id, "aprobado"|"rechazado")` → `POST /triage/{id}/aprobar|rechazar`.

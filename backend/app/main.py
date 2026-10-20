@@ -156,7 +156,11 @@ def triage_documento(documento: DocumentoClinicoRequest) -> TriageResponse:
     try:
         resultado = ejecutar_agente(documento)
     except AgenteError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detalle) from exc
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detalle,
+            headers=exc.headers,
+        ) from exc
 
     # 3. El bucket sale de la decisión real del grafo
     estado = (
@@ -214,17 +218,17 @@ def listar_historial_triage(estado: EstadoDocumento | None = None) -> list[Triag
     """
     Listado para /historial. Con `?estado=auditoria_humana` devuelve solo la cola de
     auditoría humana (pantalla /auditoria). Más recientes primero.
-    Consulta y recupera los documentos desde OCI o fallback a Cloudflare R2.
+    Combina los documentos de Cloudflare R2 y OCI (sin duplicados), sin importar STORAGE_PROVIDER.
     """
     storage = _obtener_storage_service()
     docs: list[TriageResponse] = []
     try:
-        documentos = storage.listar_documentos_triage(estado=estado)
-        for ruta, data in documentos:
+        documentos = storage.listar_documentos_triage_con_bucket(estado=estado)
+        for ruta, data, bucket in documentos:
             try:
                 doc = TriageResponse.model_validate(data)
                 doc.almacenamiento_oci = AlmacenamientoOCI(
-                    bucket=storage.get_active_bucket(),
+                    bucket=bucket,
                     ruta_objeto=ruta,
                     status_backup="exito",
                 )

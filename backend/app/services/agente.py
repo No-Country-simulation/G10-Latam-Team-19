@@ -42,10 +42,94 @@ _graph_lock = threading.Lock()
 class AgenteError(Exception):
     """Fallo al ejecutar el agente. `status_code` es el HTTP que debe devolver el endpoint."""
 
-    def __init__(self, detalle: str, status_code: int = 502) -> None:
+    def __init__(
+        self,
+        detalle: str,
+        status_code: int = 502,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         super().__init__(detalle)
         self.detalle = detalle
         self.status_code = status_code
+        self.headers = headers
+
+
+_PALABRAS_CLAVE_RATE_LIMIT = (
+    "ratelimit",
+    "rate_limit",
+    "rate limit",
+    "too many requests",
+    "resourceexhausted",
+    "resource_exhausted",
+    "resource exhausted",
+    "quota exceeded",
+    "quota_exceeded",
+    "tokens per minute",
+    "requests per minute",
+    "limit reached",
+    "insufficient_quota",
+    "error code: 429",
+    "status code 429",
+    "status 429",
+    "http 429",
+    "429 too many requests",
+)
+
+
+def _es_error_limite_llm(exc: BaseException) -> bool:
+    """
+    Detecta si una excepción proviene de un límite de tasa (Rate Limit / 429) del proveedor de LLM.
+    Examina toda la cadena de causas y contextos (__cause__, __context__), tipos y mensajes de error.
+    """
+    visitados: set[int] = set()
+    cola: list[BaseException | None] = [exc]
+
+    while cola:
+        actual = cola.pop(0)
+        if actual is None or id(actual) in visitados:
+            continue
+        visitados.add(id(actual))
+
+        # 1. Atributos de código HTTP en la excepción o en su response asociada
+        status_code = getattr(actual, "status_code", None)
+        if status_code == 429:
+            return True
+        code = getattr(actual, "code", None)
+        if code == 429 or code == "rate_limit_exceeded":
+            return True
+        http_status = getattr(actual, "http_status", None)
+        if http_status == 429:
+            return True
+
+        response = getattr(actual, "response", None)
+        if response is not None and getattr(response, "status_code", None) == 429:
+            return True
+
+        # 2. Nombre de la clase de excepción
+        tipo_nombre = type(actual).__name__.lower()
+        if any(
+            t in tipo_nombre
+            for t in (
+                "ratelimit",
+                "toomanyrequests",
+                "resourceexhausted",
+                "quotaexceeded",
+            )
+        ):
+            return True
+
+        # 3. Contenido del mensaje de error
+        msg = str(actual).lower()
+        if any(clave in msg for clave in _PALABRAS_CLAVE_RATE_LIMIT):
+            return True
+
+        # Continuar explorando la cadena de causas y contextos
+        if getattr(actual, "__cause__", None) is not None:
+            cola.append(actual.__cause__)
+        if getattr(actual, "__context__", None) is not None:
+            cola.append(actual.__context__)
+
+    return False
 
 
 @dataclass
@@ -140,6 +224,17 @@ def ejecutar_agente(documento: DocumentoClinicoRequest) -> ResultadoAgente:
         # llm_provider levanta ValueError cuando falta una API key o el proveedor es inválido.
         raise AgenteError(f"Configuración del agente inválida: {exc}", 503) from exc
     except Exception as exc:
+        if _es_error_limite_llm(exc):
+            logger.warning(
+                "Límite de uso del proveedor de IA alcanzado al procesar %s: %s",
+                documento.documento_id,
+                exc,
+            )
+            raise AgenteError(
+                "Servicio ocupado por límite de uso del proveedor de IA. Por favor, intentá en un minuto.",
+                status_code=429,
+                headers={"Retry-After": "60"},
+            ) from exc
         logger.exception("El grafo del agente falló para %s", documento.documento_id)
         raise AgenteError(f"El agente no pudo procesar el documento: {exc}") from exc
 
@@ -161,6 +256,12 @@ def ejecutar_agente(documento: DocumentoClinicoRequest) -> ResultadoAgente:
     except AgenteError:
         raise
     except Exception as exc:
+        if _es_error_limite_llm(exc):
+            raise AgenteError(
+                "Servicio ocupado por límite de uso del proveedor de IA. Por favor, intentá en un minuto.",
+                status_code=429,
+                headers={"Retry-After": "60"},
+            ) from exc
         raise AgenteError(
             f"La salida del agente no coincide con el schema del Backend: {exc}"
         ) from exc
