@@ -76,6 +76,8 @@ def extraction_node(state: AgentState) -> dict:
     import json
 
     from schemas import DatosExtraidos
+    from langchain_core.utils.function_calling import convert_to_openai_tool
+    from extraction_validation import validate_extraction
     from llm_provider import get_llm
     from prompts import build_extraction_prompt
 
@@ -88,9 +90,10 @@ def extraction_node(state: AgentState) -> dict:
     # EXTRACCIÓN: ruta principal; Pydantic valida el contrato antes de calcular completitud.
     # Capa 1: respuesta estructurada.
     try:
-        structured_llm = llm.with_structured_output(DatosExtraidos)
+        # A dict schema preserves raw keys; a Pydantic parser discards edad_, etc.
+        structured_llm = llm.with_structured_output(convert_to_openai_tool(DatosExtraidos))
         result = structured_llm.invoke(messages)
-        extracted_data = DatosExtraidos.model_validate(result)
+        extracted_data = validate_extraction(result)
 
     except Exception as structured_error:
         # EXTRACCIÓN: respaldo funcional, no una prueba temporal.
@@ -108,7 +111,7 @@ def extraction_node(state: AgentState) -> dict:
             )
 
             data = json.loads(text)
-            extracted_data = DatosExtraidos.model_validate(data)
+            extracted_data = validate_extraction(data)
 
         except Exception as fallback_error:
             raise RuntimeError(

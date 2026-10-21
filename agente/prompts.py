@@ -42,15 +42,25 @@ the document supplies information. Read the entire document, including
 its opening patient description and every vital-sign measurement:
 {
   "paciente": {"nombre": null, "edad": null, "unidad_edad": null, "sexo": null, "documento_identidad": null},
-  "medico_solicitante": null,
+  "medico_solicitante": {"nombre": null, "matricula": null},
   "estudio_realizado": null,
   "diagnostico_principal": null,
   "cie10_sugerido": null,
-  "medicamentos": null,
-  "signos_vitales": null
+  "medicamentos": [{"nombre": "<nombre explícito>", "via": null, "dosis": null, "frecuencia_diaria": null}],
+  "signos_vitales": {"temperatura": null, "frecuencia_cardiaca": null, "frecuencia_respiratoria": null, "presion_arterial": null, "saturacion_oxigeno": null}
 }
 
+The nested objects above illustrate field names, not default data. If no doctor,
+medication or vital signs are documented, return null for that whole section.
+Never copy the placeholder medication name into the response.
+
 Rules:
+- Map explicit clinical abbreviations to the schema: TA or PA -> presion_arterial,
+  FC -> frecuencia_cardiaca, FR -> frecuencia_respiratoria, SpO2 -> saturacion_oxigeno,
+  DNI -> paciente.documento_identidad; matrícula -> medico_solicitante.matricula.
+  Keep an identifier or matrícula as a string, preserving leading zeros.
+  A documented "dosis única" belongs in frecuencia_diaria; the quantity and unit
+  belong in dosis, and "vía oral" maps to via "Oral". Extract all three independently.
 - Extract only information explicitly present in the document. Populate EVERY
   field that has explicit evidence; a missing patient name does not mean
   age, sex, or vital signs are missing. Extract those independently.
