@@ -21,7 +21,7 @@ describe("validarCarga", () => {
     expect(r.ok && r.datos.canal_origen).toBe("Guardia_Emergencias");
   });
 
-  it.each(["JSON", "PDF"])("acepta el tipo %s", (tipo) => {
+  it.each(["JSON", "PDF", "IMAGEN"])("acepta el tipo %s", (tipo) => {
     expect(validarCarga({ ...valida, tipo }).ok).toBe(true);
   });
 
@@ -35,7 +35,6 @@ describe("validarCarga", () => {
     ["canal con el texto visible en lugar del valor", { canal: "Guardia de Emergencias" }],
     ["canal heredado del prototipo de objetos", { canal: "toString" }],
     ["canal ausente", { canal: null }],
-    ["tipo IMAGEN (requiere OCR)", { tipo: "IMAGEN" }],
     ["tipo desconocido", { tipo: "EXE" }],
   ])("rechaza %s", (_nombre, cambio) => {
     const r = validarCarga({ ...valida, ...cambio });

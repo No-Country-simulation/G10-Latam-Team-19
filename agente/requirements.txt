@@ -5,3 +5,5 @@ python-dotenv
 langchain-groq
 langchain-cohere
 langchain-google-genai
+pillow
+pymupdf

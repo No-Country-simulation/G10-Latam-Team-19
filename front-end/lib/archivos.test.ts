@@ -20,10 +20,13 @@ describe("clasificarArchivo", () => {
     expect(clasificarArchivo({ name: "receta.PDF", size: 10 })).toEqual({ clase: "pdf" });
   });
 
-  it.each(["foto.jpg", "foto.jpeg", "foto.png"])("rechaza la imagen %s porque requiere OCR", (name) => {
-    const r = clasificarArchivo({ name, size: 10 });
-    expect(r).toMatchObject({ clase: "rechazado" });
-    if (r.clase === "rechazado") expect(r.motivo).toMatch(/OCR/);
+  it.each(["foto.jpg", "foto.jpeg", "FOTO.PNG"])("marca la imagen %s para transcripción", (name) => {
+    expect(clasificarArchivo({ name, size: 10 })).toEqual({ clase: "imagen" });
+  });
+
+  it("sigue rechazando formatos de imagen que el backend no lee", () => {
+    expect(clasificarArchivo({ name: "foto.gif", size: 10 }).clase).toBe("rechazado");
+    expect(clasificarArchivo({ name: "foto.webp", size: 10 }).clase).toBe("rechazado");
   });
 
   it.each(["virus.exe", "macro.docm", "sin-extension", "doble.pdf.exe"])(
@@ -38,6 +41,8 @@ describe("clasificarArchivo", () => {
   it("acepta justo 10 MB y rechaza un byte más", () => {
     expect(clasificarArchivo({ name: "a.pdf", size: MAX_BYTES }).clase).toBe("pdf");
     expect(clasificarArchivo({ name: "a.pdf", size: MAX_BYTES + 1 }).clase).toBe("rechazado");
+    expect(clasificarArchivo({ name: "a.jpg", size: MAX_BYTES }).clase).toBe("imagen");
+    expect(clasificarArchivo({ name: "a.jpg", size: MAX_BYTES + 1 }).clase).toBe("rechazado");
   });
 });
 

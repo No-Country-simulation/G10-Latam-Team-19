@@ -178,6 +178,50 @@ def _cargar_grafo() -> Any:
     return _graph
 
 
+@dataclass
+class TranscripcionArchivo:
+    texto: str
+    paginas: int
+    paginas_totales: int
+
+
+# Código HTTP según el tipo de fallo que informa agente/ocr.py (OcrError.tipo).
+_STATUS_OCR = {"entrada_invalida": 422, "sin_texto": 422, "config": 503, "proveedor": 502}
+
+
+def transcribir_archivo(datos: bytes) -> TranscripcionArchivo:
+    """
+    Convierte una imagen o un PDF escaneado en texto con el LLM multimodal del agente
+    (agente/ocr.py). Solo transcribe: el texto resultante se procesa luego por el mismo
+    camino que un texto pegado a mano.
+    """
+    dir_agente = _resolver_dir_agente()
+    if str(dir_agente) not in sys.path:
+        sys.path.insert(0, str(dir_agente))
+    try:
+        import ocr  # noqa: PLC0415  (módulo plano del agente; import tardío a propósito)
+    except Exception as exc:
+        raise AgenteError(f"No se pudo importar el módulo de lectura de archivos del agente: {exc}", 503) from exc
+
+    try:
+        resultado = ocr.transcribir_archivo(datos)
+    except ocr.OcrError as exc:
+        raise AgenteError(str(exc), _STATUS_OCR.get(exc.tipo, 502)) from exc
+    except ValueError as exc:
+        # llm_provider levanta ValueError cuando falta una API key o el proveedor es inválido.
+        raise AgenteError(f"Configuración del agente inválida: {exc}", 503) from exc
+    except Exception as exc:
+        # Sin el contenido del archivo: es un documento clínico.
+        logger.exception("La transcripción falló")
+        raise AgenteError(f"No se pudo leer el archivo: {type(exc).__name__}") from exc
+
+    return TranscripcionArchivo(
+        texto=resultado.texto,
+        paginas=resultado.paginas,
+        paginas_totales=resultado.paginas_totales,
+    )
+
+
 def _a_dict_json(valor: Any) -> dict[str, Any]:
     """Modelo pydantic del agente (o dict) -> dict JSON-compatible."""
     if hasattr(valor, "model_dump"):

@@ -21,6 +21,32 @@ interface ArchivoElegido {
   texto: string | null;
   tipo: TipoArchivo;
   aviso: string | null;
+  /** El texto lo leyó una IA desde una imagen: la persona debe revisarlo antes de enviarlo. */
+  transcripto?: boolean;
+  /** Mensaje informativo que no impide enviar (p. ej. se leyeron solo las primeras páginas). */
+  nota?: string | null;
+}
+
+type ResultadoOcr = { ok: true; texto: string; nota: string | null } | { ok: false; error: string };
+
+/** Pide al backend (vía /api/ocr) que lea una imagen o un PDF escaneado. */
+async function transcribir(file: File): Promise<ResultadoOcr> {
+  const form = new FormData();
+  form.append("archivo", file);
+  try {
+    const res = await fetch("/api/ocr", { method: "POST", body: form, signal: AbortSignal.timeout(200_000) });
+    const cuerpo: unknown = await res.json().catch(() => null);
+    const datos = cuerpo as { texto?: unknown; paginas?: unknown; paginasTotales?: unknown; error?: unknown } | null;
+    if (!res.ok || typeof datos?.texto !== "string") {
+      return { ok: false, error: typeof datos?.error === "string" ? datos.error : "No se pudo leer el archivo." };
+    }
+    const leidas = Number(datos.paginas);
+    const totales = Number(datos.paginasTotales);
+    const nota = totales > leidas ? `Se leyeron las primeras ${leidas} de ${totales} páginas.` : null;
+    return { ok: true, texto: datos.texto, nota };
+  } catch {
+    return { ok: false, error: "No se pudo leer el archivo. Revisá la conexión y probá de nuevo." };
+  }
 }
 
 /** Extrae el texto de un PDF en el navegador. unpdf se carga solo cuando hace falta. */
@@ -40,43 +66,78 @@ export function CargarDocumento() {
   const [archivo, setArchivo] = useState<ArchivoElegido | null>(null);
   const [arrastrando, setArrastrando] = useState(false);
   const [leyendo, setLeyendo] = useState(false);
+  const [transcribiendo, setTranscribiendo] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  // Cada archivo elegido toma un turno: si se elige otro mientras uno se lee, el resultado viejo se descarta.
+  const turnoActual = useRef(0);
 
   async function elegir(file: File | undefined) {
     if (!file) return;
+    const turno = ++turnoActual.current;
+    const vigente = () => turno === turnoActual.current;
     const base = { nombre: file.name, bytes: file.size };
     const clase = clasificarArchivo(file);
 
     if (clase.clase === "rechazado") {
+      setLeyendo(false);
+      setTranscribiendo(false);
       setArchivo({ ...base, texto: null, tipo: "TEXTO", aviso: clase.motivo });
       return;
     }
 
     setLeyendo(true);
+    setTranscribiendo(false);
+    setArchivo(null);
+
+    /** Lee la imagen o el PDF escaneado con IA y deja el texto para que la persona lo revise. */
+    async function conIa(tipo: TipoArchivo) {
+      setTranscribiendo(true);
+      const r = await transcribir(file as File);
+      if (!vigente()) return;
+      setArchivo(
+        r.ok
+          ? { ...base, texto: r.texto, tipo, aviso: null, transcripto: true, nota: r.nota }
+          : { ...base, texto: null, tipo, aviso: r.error },
+      );
+    }
+
     try {
+      if (clase.clase === "imagen") {
+        await conIa("IMAGEN");
+        return;
+      }
+
       const texto = clase.clase === "pdf" ? await extraerTextoPdf(file) : (await file.text()).trim();
+      if (!vigente()) return;
       const tipo = clase.clase === "pdf" ? "PDF" : clase.tipo;
+
+      // Un PDF sin texto seleccionable es un escaneo: se lee como imagen.
+      if (clase.clase === "pdf" && texto.length < MIN_TEXTO) {
+        await conIa("PDF");
+        return;
+      }
+
       let aviso: string | null = null;
       if (texto.length < MIN_TEXTO) {
-        aviso =
-          clase.clase === "pdf"
-            ? "Este PDF no tiene texto seleccionable (parece escaneado) y necesitaría OCR."
-            : "El archivo casi no tiene texto.";
+        aviso = "El archivo casi no tiene texto.";
       } else if (texto.length > MAX_TEXTO) {
         aviso = "El documento es demasiado largo para procesarlo.";
       }
       setArchivo({ ...base, texto: aviso ? null : texto, tipo, aviso });
     } catch {
-      setArchivo({ ...base, texto: null, tipo: "TEXTO", aviso: "No se pudo leer el archivo." });
+      if (vigente()) setArchivo({ ...base, texto: null, tipo: "TEXTO", aviso: "No se pudo leer el archivo." });
     } finally {
-      setLeyendo(false);
+      if (vigente()) {
+        setLeyendo(false);
+        setTranscribiendo(false);
+      }
     }
   }
 
   const listo =
     pestana === "texto"
       ? texto.trim().length >= MIN_TEXTO
-      : Boolean(archivo?.texto && !archivo.aviso && !leyendo);
+      : Boolean(archivo?.texto && archivo.texto.trim().length >= MIN_TEXTO && !archivo.aviso && !leyendo);
 
   return (
     <form
@@ -159,7 +220,7 @@ export function CargarDocumento() {
           {leyendo && (
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" />
-              Leyendo el archivo…
+              {transcribiendo ? "Leyendo el documento con IA… puede tardar unos segundos" : "Leyendo el archivo…"}
             </p>
           )}
 
@@ -175,11 +236,13 @@ export function CargarDocumento() {
                 <p className="truncate font-medium">{archivo.nombre}</p>
                 <p className="text-xs text-muted-foreground">{formatearTamano(archivo.bytes)}</p>
                 {archivo.aviso && <p className="mt-1 text-xs text-destructive">{archivo.aviso}</p>}
+                {archivo.nota && <p className="mt-1 text-xs text-muted-foreground">{archivo.nota}</p>}
               </div>
               <button
                 type="button"
                 aria-label="Quitar archivo"
                 onClick={() => {
+                  turnoActual.current++;
                   setArchivo(null);
                   if (input.current) input.current.value = "";
                 }}
@@ -190,7 +253,29 @@ export function CargarDocumento() {
             </div>
           )}
 
-          {archivo?.texto && !archivo.aviso && (
+          {archivo && !archivo.aviso && archivo.transcripto && (
+            <div className="space-y-2">
+              <label htmlFor="texto_transcripto" className="block text-sm font-medium">
+                Texto leído por la IA
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Revisalo y corregí lo que haga falta antes de procesar. Lo marcado como [ilegible] no se pudo leer con
+                certeza.
+              </p>
+              <textarea
+                id="texto_transcripto"
+                name="documento_texto"
+                value={archivo.texto ?? ""}
+                onChange={(e) => setArchivo((a) => (a ? { ...a, texto: e.target.value } : a))}
+                rows={8}
+                maxLength={MAX_TEXTO}
+                className="min-h-40 w-full resize-y rounded-2xl border bg-card p-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              <input type="hidden" name="tipo_archivo" value={archivo.tipo} />
+            </div>
+          )}
+
+          {archivo?.texto && !archivo.aviso && !archivo.transcripto && (
             <>
               <input type="hidden" name="documento_texto" value={archivo.texto} />
               <input type="hidden" name="tipo_archivo" value={archivo.tipo} />

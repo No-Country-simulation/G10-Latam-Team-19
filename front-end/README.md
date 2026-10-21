@@ -75,7 +75,7 @@ front-end/
 - Toda la lectura y escritura de datos pasa por `lib/api.ts`. Apuntar al backend real implica cambiar únicamente esa capa, sin tocar páginas ni componentes.
 - **Con `API_URL`** se usa el backend real para todo (listar, detalle, procesar, aprobar y rechazar). Si el backend falla, se muestra una pantalla de error con "Reintentar": no se cae a datos de ejemplo, para no mostrar pacientes ficticios como reales.
 - **Sin `API_URL`** la app entra en **modo demo**: datos de ejemplo en memoria (se reinician al reiniciar el servidor) y un aviso visible en la cabecera. Al procesar un documento se devuelve un resultado de ejemplo, no un análisis del texto.
-- La carga acepta texto pegado, `.txt`, `.json` y PDF con texto (se extrae en el navegador). Imágenes y PDF escaneados requieren OCR, que el backend aún no ofrece.
+- La carga acepta texto pegado, `.txt`, `.json` y PDF con texto (se extrae en el navegador). Las imágenes (JPG, PNG) y los PDF escaneados se transcriben con IA en el backend (`POST /ocr`, vía `/api/ocr`) y la persona revisa el texto antes de procesarlo; en modo demo (sin `API_URL`) no están disponibles.
 
 Variable de entorno (archivo `.env.local`):
 
@@ -102,7 +102,7 @@ Las pruebas (Vitest) cubren la lógica sin interfaz: adaptador del contrato, rep
 - [x] Integración con el backend real
 - [x] Pruebas unitarias de la capa de datos y validación
 - [ ] Autenticación y roles (fuera del alcance actual)
-- [ ] OCR para imágenes y PDF escaneados (depende del backend)
+- [x] OCR para imágenes y PDF escaneados (`POST /ocr` del backend)
 
 ## Documentación adicional
 

@@ -5,6 +5,7 @@ Backend para triaje, extracción y enrutamiento inteligente de documentos clíni
 Conectado con OCI Object Storage y listo para consumo directo desde Next.js.
 
 Endpoints:
+    - POST /ocr                             -> Transcribe una imagen o PDF escaneado a texto (no guarda).
     - POST /triage                          -> Procesa y clasifica un documento clínico.
     - GET  /triage                          -> Retorna el historial de documentos procesados (para /historial).
     - GET  /triage/{documento_id}           -> Obtiene el detalle de triaje de un documento (para /triaje/[id]).
@@ -17,9 +18,10 @@ Endpoints:
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, File, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -30,7 +32,7 @@ from app.schemas import (
     EstadoDocumento,
     TriageResponse,
 )
-from app.services.agente import AgenteError, ejecutar_agente
+from app.services.agente import AgenteError, ejecutar_agente, transcribir_archivo
 from app.services.storage import StorageProvider, get_storage_service
 
 logging.basicConfig(level=logging.INFO)
@@ -69,6 +71,22 @@ class RevisionHumanaRequest(BaseModel):
     """
     comentario: str | None = None
     revisor: str | None = None
+
+
+class TranscripcionResponse(BaseModel):
+    """
+    Respuesta de POST /ocr. Definida acá (no en schemas.py) porque es un detalle de este
+    endpoint, no parte del contrato compartido con Agente.
+    """
+    texto: str
+    paginas: int
+    paginas_totales: int
+
+
+# Tope del archivo que se acepta para transcribir (el mismo que muestra el Frontend).
+MAX_ARCHIVO_BYTES = 10 * 1024 * 1024
+_TIPOS_OCR = {"image/jpeg", "image/png", "application/pdf"}
+_EXTENSIONES_OCR = {".jpg", ".jpeg", ".png", ".pdf"}
 
 
 # -----------------------------
@@ -124,6 +142,54 @@ def _cargar_documento(documento_id: str) -> TriageResponse | None:
 def health_check():
     """Endpoint de salud para monitorización del servicio."""
     return {"status": "ok", "service": "mediflow-api", "timestamp": datetime.now(timezone.utc)}
+
+
+@app.post(
+    "/ocr",
+    response_model=TranscripcionResponse,
+    status_code=status.HTTP_200_OK,
+    tags=["Triaje"],
+    summary="Transcribir una imagen o un PDF escaneado a texto",
+)
+def transcribir_documento(archivo: UploadFile = File(...)) -> TranscripcionResponse:
+    """
+    Lee una imagen (JPG/PNG) o un PDF escaneado con el LLM multimodal del agente y devuelve
+    el texto. NO clasifica ni guarda nada: el texto vuelve para que una persona lo revise y
+    luego se envía a `POST /triage` como cualquier otro texto (con `tipo_archivo` IMAGEN o PDF).
+    Lo que el modelo no pudo leer con certeza viene marcado como `[ilegible]`.
+    """
+    extension = Path(archivo.filename or "").suffix.lower()
+    tipo = (archivo.content_type or "").lower()
+    if tipo not in _TIPOS_OCR and extension not in _EXTENSIONES_OCR:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Formato no soportado. Usá una imagen JPG o PNG, o un PDF.",
+        )
+
+    datos = archivo.file.read(MAX_ARCHIVO_BYTES + 1)
+    if len(datos) > MAX_ARCHIVO_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"El archivo supera el máximo de {MAX_ARCHIVO_BYTES // (1024 * 1024)} MB.",
+        )
+    if not datos:
+        raise HTTPException(status_code=422, detail="El archivo está vacío.")
+
+    try:
+        resultado = transcribir_archivo(datos)
+    except AgenteError as exc:
+        # El Frontend le muestra a la persona un mensaje genérico en los errores 5xx; el motivo
+        # real (clave faltante, cuota, modelo sin visión…) queda acá, sin contenido del documento.
+        logger.warning("POST /ocr falló (%s): %s", exc.status_code, exc.detalle)
+        raise HTTPException(status_code=exc.status_code, detail=exc.detalle) from exc
+
+    # Solo metadatos en el log: el contenido es un documento clínico.
+    logger.info("Transcripción OK (%s/%s páginas, %s caracteres)", resultado.paginas, resultado.paginas_totales, len(resultado.texto))
+    return TranscripcionResponse(
+        texto=resultado.texto,
+        paginas=resultado.paginas,
+        paginas_totales=resultado.paginas_totales,
+    )
 
 
 @app.post(

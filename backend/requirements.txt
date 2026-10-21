@@ -11,3 +11,8 @@ langchain-core
 langchain-groq
 langchain-cohere
 langchain-google-genai
+
+# Lectura de imágenes y PDF escaneados (POST /ocr)
+python-multipart>=0.0.9
+pillow>=10
+pymupdf>=1.24

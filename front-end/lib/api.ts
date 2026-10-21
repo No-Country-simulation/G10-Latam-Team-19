@@ -4,6 +4,7 @@
 // para no presentar pacientes ficticios como si fueran reales.
 import type { DocumentoClinicoRequest } from "@/types/triage";
 import { TRIAJES_MOCK } from "@/lib/mocks/triajes";
+import { ErrorOcr, transcribirConBackend, type Transcripcion } from "@/lib/ocr";
 import { filtrarPendientesAuditoria } from "@/lib/triajes/consultas";
 import { crearRepositorioHttp } from "@/lib/triajes/http";
 import { crearRepositorioMemoria, sembrarTriajes } from "@/lib/triajes/memoria";
@@ -40,3 +41,17 @@ export const resolverAuditoria = (id: string, decision: DecisionAuditoria): Prom
 
 export const procesarDocumento = (req: DocumentoClinicoRequest): Promise<Triaje> =>
   repositorio.procesar(req);
+
+/**
+ * Transcribe una imagen o un PDF escaneado a texto (POST /ocr del backend). Solo existe con
+ * backend: el modo demo no tiene modelo de visión y no inventa una transcripción.
+ */
+export const transcribirArchivo = (archivo: Blob, nombre: string): Promise<Transcripcion> =>
+  API_URL
+    ? transcribirConBackend(API_URL, archivo, nombre)
+    : Promise.reject(
+        new ErrorOcr(
+          "El modo demo no incluye la lectura de imágenes. Pegá el texto manualmente.",
+          503,
+        ),
+      );

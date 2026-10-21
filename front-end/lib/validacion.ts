@@ -17,8 +17,11 @@ export const MIN_TEXTO = 10;
 /** Tope propio: evita enviar al agente textos desproporcionados (y el límite de 1 MB de las server actions). */
 export const MAX_TEXTO = 200_000;
 
-/** Tipos que el navegador sabe convertir a texto. IMAGEN queda fuera: requiere OCR. */
-const TIPOS_ENVIABLES: readonly TipoArchivo[] = ["TEXTO", "JSON", "PDF"];
+/**
+ * Tipos cuyo texto ya está resuelto al enviar. IMAGEN entra porque la foto se transcribe
+ * antes (POST /ocr) y la persona revisa ese texto: al backend llega como texto.
+ */
+const TIPOS_ENVIABLES: readonly TipoArchivo[] = ["TEXTO", "JSON", "PDF", "IMAGEN"];
 
 export type DatosCarga = Omit<DocumentoClinicoRequest, "documento_id">;
 
