@@ -7,8 +7,9 @@ from schemas import DatosExtraidos, TipoDocumento
 # Fuente: Proyecto alura_Data_UmbralScoreyReglas.pdf, pp. 10-11.
 # Condiciones pendientes y decisiones temporales: PESOS_PENDIENTES.md.
 MISSING_FIELD_PENALTIES = MappingProxyType({
+    "paciente.nombre": 0.30,
     "medicamentos_o_dosis": 0.30,
-    "paciente.unidad_edad": 0.30,  # Pendiente: señal explícita de pediatría.
+    "paciente.unidad_edad": 0.30,
     "diagnostico_o_cie10": 0.15,
     "paciente.edad": 0.15,
     "signos_vitales": 0.10,
