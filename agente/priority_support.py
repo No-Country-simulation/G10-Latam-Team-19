@@ -14,9 +14,6 @@ def evaluate_clinical_support(diagnosis: str | None, study: str | None) -> Apoyo
     from nodes import _message_content_to_text
 
     llm = get_llm()
-    # La respuesta de apoyo es breve; evita reservar el presupuesto de extracción.
-    configured_tokens = getattr(llm, "max_tokens", None)
-    llm.max_tokens = min(configured_tokens, 256) if isinstance(configured_tokens, int) and configured_tokens > 0 else 256
     messages = build_priority_support_prompt(diagnosis, study)
     try:
         result = llm.with_structured_output(ApoyoPrioridad).invoke(messages)

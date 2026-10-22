@@ -27,15 +27,15 @@ class SupportTests(unittest.TestCase):
                 if not fallback:
                     llm.invoke.assert_not_called()
 
-    def test_support_token_budget_respects_lower_configuration(self):
-        for configured, expected in ((800, 256), (128, 128), (None, 256)):
+    def test_support_does_not_mutate_provider_configuration(self):
+        for configured in (800, 128, None):
             with self.subTest(configured=configured):
                 llm = Mock()
                 llm.max_tokens = configured
                 llm.with_structured_output.return_value.invoke.return_value = {"nivel_prioridad": "Rutina", "justificacion": "Control"}
                 with patch("llm_provider.get_llm", return_value=llm):
                     evaluate_clinical_support("Control", None)
-                self.assertEqual(llm.max_tokens, expected)
+                self.assertEqual(llm.max_tokens, configured)
 
     def test_invalid_structured_response_uses_valid_fallback(self):
         llm = Mock()
