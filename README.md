@@ -24,7 +24,7 @@ Video demo (Pendiente)
 - [Pruebas automatizadas](#pruebas-automatizadas)
 - [Almacenamiento](#almacenamiento)
 - [Cumplimiento del brief](#cumplimiento-del-brief)
-- [Límites conocidos y próximos pasos](#límites-conocidos-y-próximos-pasos)
+- [Límites conocidos](#límites-conocidos)
 - [Equipo](#equipo)
 
 ---
