@@ -3,9 +3,6 @@ from types import MappingProxyType
 
 from schemas import DatosExtraidos, TipoDocumento
 
-
-# Fuente: Proyecto alura_Data_UmbralScoreyReglas.pdf, pp. 10-11.
-# Condiciones pendientes y decisiones temporales: PESOS_PENDIENTES.md.
 MISSING_FIELD_PENALTIES = MappingProxyType({
     "paciente.nombre": 0.30,
     "medicamentos_o_dosis": 0.30,
