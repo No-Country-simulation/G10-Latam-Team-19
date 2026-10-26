@@ -4,7 +4,7 @@
 
 Hackathon ONE G10 · Oracle Next Education & Alura · Equipo 19 (G10-LATAM)
 
-Video demo (Pendiente)
+[Video demo](https://youtu.be/JGrnRUqmw64)
 
 > Proyecto educativo que trabaja solo con datos sintéticos. No reemplaza el criterio clínico.
 
