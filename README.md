@@ -334,7 +334,7 @@ En desarrollo se usa Cloudflare R2, y en la demo Oracle Cloud Infrastructure Obj
 | Documentación con diagrama del flujo del agente | Este documento |
 | Panel de auditoría Human-in-the-Loop (diferencial) | Cumplido, en Next.js |
 | OCR y lectura multimodal (diferencial) | Cumplido, con un modelo multimodal |
-| Despliegue completo en OCI Compute (diferencial) | Pendiente |
+| Despliegue completo en OCI Compute (diferencial) | Cumplido |
 
 ## Límites conocidos
 
