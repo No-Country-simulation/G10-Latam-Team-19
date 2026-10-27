@@ -4,7 +4,7 @@
 
 Hackathon ONE G10 · Oracle Next Education & Alura · Equipo 19 (G10-LATAM)
 
-[Video demo](https://youtu.be/JGrnRUqmw64)
+[Video demo](https://youtu.be/JGrnRUqmw64) | [Página web](https://mediflow-team19.duckdns.org)
 
 > Proyecto educativo que trabaja solo con datos sintéticos. No reemplaza el criterio clínico.
 
